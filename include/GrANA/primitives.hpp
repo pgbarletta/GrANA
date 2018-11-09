@@ -5,8 +5,8 @@
 using EPIC = CGAL::Exact_predicates_inexact_constructions_kernel;
 using Point_3 = EPIC::Point_3;
 
-#include <fmt/format.h>
 #include <array>
+#include <fmt/format.h>
 
 namespace GrANA {
 
@@ -15,44 +15,29 @@ public:
     Vector() = default;
 
     Vector(float const x, float const y, float const z) noexcept :
-    	_vxyz{x, y, z}, _origin{0., 0., 0.} {}
+        _vxyz{x, y, z}, _origin{0., 0., 0.} {}
 
-    Vector(float const x, float const y, float const z,
-    	float const ox, float const oy, float const oz) noexcept :
-        _vxyz{x, y, z},  _origin{ox, oy, oz} {}
+    Vector(float const x, float const y, float const z, float const ox,
+        float const oy, float const oz) noexcept :
+        _vxyz{x, y, z},
+        _origin{ox, oy, oz} {}
 
-    float operator[] (int const idx) const {
-    	return _vxyz[idx];
-    }
+    float operator[](int const idx) const { return _vxyz[idx]; }
+    float &operator[](int const idx) { return _vxyz[idx]; }
 
-    float &operator[] (int const idx) {
-    	return _vxyz[idx];
-    }
+    // Origin access and modification.
+    float get_ox() const { return _origin[0]; }
+    float get_oy() const { return _origin[1]; }
+    float get_oz() const { return _origin[2]; }
+    void set_ox(float ox) { _origin[0] = ox; }
+    void set_oy(float oy) { _origin[1] = oy; }
+    void set_oz(float oz) { _origin[2] = oz; }
 
-    // Vector origin access and modification.
-    float get_ox() const {
-        return _origin[0];
-    }
-    float get_oy() const {
-        return _origin[1];
-    }
-    float get_oz() const {
-        return _origin[2];
-    }
-    void set_ox(float ox) {
-        _origin[0] = ox;
-    }
-    void set_oy(float oy) {
-        _origin[1] = oy;
-    }
-    void set_oz(float oz) {
-        _origin[2] = oz;
-    }
 private:
     std::array<float, 3> _vxyz, _origin;
 };
 
-inline std::ostream& operator<<(std::ostream &stream, Vector const &v) {
+inline std::ostream &operator<<(std::ostream &stream, Vector const &v) {
     stream << v[0] << " " << v[1] << " " << v[2];
     return stream;
 }
@@ -70,18 +55,18 @@ inline Vector operator-(Vector const &lhs, Vector const &rhs) {
 }
 
 inline bool operator==(Vector const &lhs, Vector const &rhs) {
-    return (lhs[0] == rhs[0] && lhs[1] == rhs[1] && lhs[2] == rhs[2] &&
-        lhs.get_ox() == rhs.get_ox() && lhs.get_oy() == rhs.get_oy() &&
-        lhs.get_oz() == rhs.get_oz());
+    return (lhs[0] == rhs[0] && lhs[1] == rhs[1] && lhs[2] == rhs[2]
+        && lhs.get_ox() == rhs.get_ox() && lhs.get_oy() == rhs.get_oy()
+        && lhs.get_oz() == rhs.get_oz());
 }
 
 // Get the magnitude of the Vector.
- inline float norm(Vector const &v) {
-	 const float dx = v[0] - v.get_ox();
-	 const float dy = v[1] - v.get_oy();
-	 const float dz = v[2] - v.get_oz();
-	 return std::sqrt(dx*dx + dy*dy + dz*dz);
- }
+inline float norm(Vector const &v) {
+    const float dx = v[0] - v.get_ox();
+    const float dy = v[1] - v.get_oy();
+    const float dz = v[2] - v.get_oz();
+    return std::sqrt(dx * dx + dy * dy + dz * dz);
+}
 
 class Point {
 public:
@@ -89,37 +74,36 @@ public:
 
     Point(float const x, float const y, float const z) : _xyz{x, y, z} {}
 
-    Point(Point_3 const p) : _xyz{static_cast<float>(CGAL::to_double(p.x())),
-    	static_cast<float>(CGAL::to_double(p.y())),
-    	static_cast<float>(CGAL::to_double(p.z()))} {}
+    Point(Point_3 const p) :
+        _xyz{static_cast<float>(CGAL::to_double(p.x())),
+            static_cast<float>(CGAL::to_double(p.y())),
+            static_cast<float>(CGAL::to_double(p.z()))} {}
 
     // Draw atom.
     void draw(FILE *out_file, int const idx, int const resid) {
-	    fmt::print(
-            out_file,
-            "{: <6}{: >5} {: <4s} {:3} {:1}{: >4}    {:8.3f}{:8.3f}{:8.3f}{:6.2f}{:6.2f}          {: >2s}\n",
-            "HETATM", idx, "H", "GPU", "A", resid, _xyz[0], _xyz[1], _xyz[2], 1.0, 0.0, "H"
-		    );
-	    return;
+        fmt::print(out_file,
+            "{: <6}{: >5} {: <4s} {:3} {:1}{: >4}    "
+            "{:8.3f}{:8.3f}{:8.3f}{:6.2f}{:6.2f}          {: >2s}\n",
+            "HETATM", idx, "H", "GPU", "A", resid, _xyz[0], _xyz[1], _xyz[2],
+            1.0, 0.0, "H");
+        return;
     }
 
-    float operator[] (int const idx) const {
-        return _xyz[idx];
-    }
+    float operator[](int const idx) const { return _xyz[idx]; }
 
 private:
-    std::array<float, 3>  _xyz;
+    std::array<float, 3> _xyz;
 };
 
-inline std::ostream& operator<<(std::ostream &stream, Point const &p) {
-	    stream << p[0] << " " << p[1] << " " << p[2];
-	    return stream;
+inline std::ostream &operator<<(std::ostream &stream, Point const &p) {
+    stream << p[0] << " " << p[1] << " " << p[2];
+    return stream;
 }
 
 // Returns a Vector starting on this Point coordinates.
 inline Vector operator-(Point const &lhs, Point const &rhs) {
-    return Vector(lhs[0] - rhs[0], lhs[1] - rhs[1], lhs[2] - rhs[2],
-        lhs[0], lhs[1], lhs[2]);
+    return Vector(lhs[0] - rhs[0], lhs[1] - rhs[1], lhs[2] - rhs[2], lhs[0],
+        lhs[1], lhs[2]);
 }
 // Displaces the Point along the Vector.
 inline Point operator+(Point const &p, Vector const &v) {
@@ -142,32 +126,30 @@ inline Vector point_to_vector(Point const &in_point) {
 
 // Get the distance between 2 points
 inline float distance(Point const &p0, Point const &p1) {
- float const dx = p0[0] - p1[0];
- float const dy = p0[1] - p1[1];
- float const dz = p0[2] - p1[2];
- return std::sqrt(dx*dx + dy*dy + dz*dz);
+    float const dx = p0[0] - p1[0];
+    float const dy = p0[1] - p1[1];
+    float const dz = p0[2] - p1[2];
+    return std::sqrt(dx * dx + dy * dy + dz * dz);
 }
 
 class Triangle {
 public:
     Triangle() = default;
 
-    Triangle(float const x0, float const y0, float const z0,
-        float const x1, float const y1, float const z1,
-        float const x2, float const y2, float const z2) :
+    Triangle(float const x0, float const y0, float const z0, float const x1,
+        float const y1, float const z1, float const x2, float const y2,
+        float const z2) :
         _p({Point(x0, y0, z0), Point(x1, y1, z1), Point(x2, y2, z2)}) {}
 
     // From GrANA::Point
     Triangle(Point const &p0, Point const &p1, Point const &p2) :
-    	_p({p0, p1, p2}) {}
+        _p({p0, p1, p2}) {}
 
     // From CGAL Point
     Triangle(Point_3 const &p0, Point_3 const &p1, Point_3 const &p2) :
-    	_p({Point(p0), Point(p1), Point(p2)}) {}
+        _p({Point(p0), Point(p1), Point(p2)}) {}
 
-    Point operator[](int const idx) const {
-    	return _p[idx];
-    }
+    Point operator[](int const idx) const { return _p[idx]; }
 
     // Draw triangle.
     void draw(FILE *out_file, int const start_idx, int const resid);
@@ -175,7 +157,7 @@ public:
     std::array<Point, 3> _p;
 };
 
-inline std::ostream& operator<<(std::ostream &stream, const Triangle& t) {
+inline std::ostream &operator<<(std::ostream &stream, const Triangle &t) {
     stream << t._p[0] << "\t" << t._p[1] << "\t" << t._p[2];
     return stream;
 }
@@ -183,33 +165,31 @@ inline std::ostream& operator<<(std::ostream &stream, const Triangle& t) {
 class Tetrahedron {
 public:
     Tetrahedron() = default;
-    Tetrahedron(float const x0, float const y0, float const z0,
-        float const x1, float const y1, float const z1,
-        float const x2, float const y2, float const z2,
-        float const x3, float const y3, float const z3) :
+    Tetrahedron(float const x0, float const y0, float const z0, float const x1,
+        float const y1, float const z1, float const x2, float const y2,
+        float const z2, float const x3, float const y3, float const z3) :
         _p({Point(x0, y0, z0), Point(x1, y1, z1), Point(x2, y2, z2),
-    	Point(x3, y3, z3)}) {}
+            Point(x3, y3, z3)}) {}
 
     // From GrANA::Point
-    Tetrahedron(Point const &p0, Point const &p1, Point const &p2,
-    		Point const &p3) : _p({p0, p1, p2, p3}) {}
+    Tetrahedron(
+        Point const &p0, Point const &p1, Point const &p2, Point const &p3) :
+        _p({p0, p1, p2, p3}) {}
 
     // From CGAL Point
     Tetrahedron(Point_3 const &p0, Point_3 const &p1, Point_3 const &p2,
-    	Point_3 const &p3) : _p({Point(p0), Point(p1), Point(p2), Point(p3)}) {}
+        Point_3 const &p3) :
+        _p({Point(p0), Point(p1), Point(p2), Point(p3)}) {}
 
-    Point operator[](int const idx) const {
-    	return _p[idx];
-    }
+    Point operator[](int const idx) const { return _p[idx]; }
 
     // Draw tetrahedron.
-    void draw (FILE *out_file, int const start_idx, int const resid);
-
+    void draw(FILE *out_file, int const start_idx, int const resid);
 
     std::array<Point, 4> _p;
 };
 
-inline std::ostream& operator<<(std::ostream &stream, Tetrahedron const &t) {
+inline std::ostream &operator<<(std::ostream &stream, Tetrahedron const &t) {
     stream << t._p[0] << "\t" << t._p[1] << "\t" << t._p[2] << "\t" << t._p[3];
     return stream;
 }
@@ -232,7 +212,7 @@ public:
     std::array<Point, 8> _p;
     float _dim;
 };
-std::ostream& operator<<(std::ostream &stream, Cube const &t);
+std::ostream &operator<<(std::ostream &stream, Cube const &t);
 
 class Prism {
 public:
@@ -240,23 +220,21 @@ public:
 
     // From GrANA::Point
     Prism(Point const &p0, Point const &p1, Point const &p2, Point const &p3,
-    	Point const &p4, Point const &p5, Point const &p6, Point const &p7);
+        Point const &p4, Point const &p5, Point const &p6, Point const &p7);
 
     // From CGAL Point
     Prism(Point_3 const &p0, Point_3 const &p1, Point_3 const &p2,
-    	Point_3 const &p3, Point_3 const &p4, Point_3 const &p5,
-    	Point_3 const &p6,  Point_3 const &p7);
+        Point_3 const &p3, Point_3 const &p4, Point_3 const &p5,
+        Point_3 const &p6, Point_3 const &p7);
 
-    Point &operator[](int const idx) {
-    	return _p[idx];
-    }
+    Point &operator[](int const idx) { return _p[idx]; }
 
     // Draw prism.
     void draw(FILE *out_file, int const start_idx, int const resid);
 
     std::array<Point, 8> _p;
 };
-std::ostream& operator<<(std::ostream &stream, Prism const &t);
+std::ostream &operator<<(std::ostream &stream, Prism const &t);
 
 auto determinant(Vector const &v0, Vector const &v1, Vector const &v2) -> float;
 auto determinant(Tetrahedron const &t) -> float;

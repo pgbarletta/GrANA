@@ -1,97 +1,86 @@
 #ifndef GrANA_GRID
 #define GrANA_GRID
 
-#include <string>
-#include <fstream>
-#include <iostream>
-#include <array>
-#include <fmt/format.h>
 #include "GrANA/continuous.hpp"
 #include "GrANA/utils.hpp"
+#include <array>
+#include <fmt/format.h>
+#include <fstream>
+#include <iostream>
+#include <string>
 
 namespace GrANA {
 
-    class GridPoint {
-    public:
-        using grid_idx_t = int32_t;
+class GridPoint {
+public:
+    using grid_idx_t = int32_t;
 
-        GridPoint() = default;
+    GridPoint() = default;
 
-        GridPoint(const grid_idx_t x, const grid_idx_t y, const grid_idx_t z)
-            noexcept : _xyz{x, y, z} {}
+    GridPoint(
+        const grid_idx_t x, const grid_idx_t y, const grid_idx_t z) noexcept :
+        _xyz{x, y, z} {}
 
-        GridPoint(const Point &p) noexcept :
-            _xyz{cont_to_grid(p[0]), cont_to_grid(p[1]), cont_to_grid(p[2])} {}
+    GridPoint(const Point &p) noexcept :
+        _xyz{cont_to_grid(p[0]), cont_to_grid(p[1]), cont_to_grid(p[2])} {}
 
-        // Draw GridPoint as atom.
-        void draw(FILE *ou_fil, int idx, int resid);
+    // Draw GridPoint as atom.
+    void draw(FILE *ou_fil, int idx, int resid);
 
-        // // Returns a vector starting on this point coordinates.
-        // vector operator-(const point& p) const {
-        //     return vector(_x - p[0], _y - p[1], _z - p[2],
-        //         _x, _y, _z);
-        // }
-        // bool operator==(const point &p) const {
-        //         return (_x == p[0] && _y == p[1] && _z == p[2]);
-        // }
-        grid_idx_t &operator[] (int idx) {
-        	return _xyz[idx];
-        }
-        grid_idx_t operator[] (int idx) const {
-        	return _xyz[idx];
-        }
-    private:
-        std::array<grid_idx_t, 3> _xyz;
-    };
-    std::ostream& operator<<(std::ostream &stream, const GridPoint& t);
-    // Turn a grid point into a continuous point, given the resolution.
-    Point GridPoint_to_point(const GridPoint &in_point);
+    grid_idx_t &operator[](int idx) { return _xyz[idx]; }
+    grid_idx_t operator[](int idx) const { return _xyz[idx]; }
 
-    // Turn a grid point into a continuous point, given the resolution.
-    GridPoint point_to_GridPoint(const Point &in_point);
+private:
+    std::array<grid_idx_t, 3> _xyz;
+};
+std::ostream &operator<<(std::ostream &stream, const GridPoint &t);
+// Turn a grid point into a continuous point, given the resolution.
+Point GridPoint_to_point(const GridPoint &in_point);
 
-    class GridMolecule {
-    public:
-        // GridMolecule() noexcept : _natoms(0), _orig_vtor(Vector(0.0f, 0.0f, 0.0f)),
-        //     _xyz(nullptr), _in_xyz(nullptr), _radii(nullptr), _in_radii(nullptr) {};
-        GridMolecule() = default;
-        GridMolecule(Molecule const &in_mol, Point const &orig_point);
+// Turn a grid point into a continuous point, given the resolution.
+GridPoint point_to_GridPoint(const Point &in_point);
 
-        ~GridMolecule() {
-            free(_xyz);
-            free(_in_xyz);
-            free(_radii);
-            free(_in_radii);
-        }
+class GridMolecule {
+public:
+    // GridMolecule() noexcept : _natoms(0), _orig_vtor(Vector(0.0f, 0.0f,
+    // 0.0f)),
+    //     _xyz(nullptr), _in_xyz(nullptr), _radii(nullptr), _in_radii(nullptr)
+    //     {};
+    GridMolecule() = default;
+    GridMolecule(Molecule const &in_mol, Point const &orig_point);
 
-        void draw(std::string const &ou_fil);
+    ~GridMolecule() {
+        free(_xyz);
+        free(_in_xyz);
+        free(_radii);
+        free(_in_radii);
+    }
 
-        int _natoms{0};
-        Vector _orig_vtor{0.0f, 0.0f, 0.0f};
-        GridPoint *_xyz = nullptr, *_in_xyz = nullptr;
-        float *_radii = nullptr, *_in_radii = nullptr;
-    };
+    void draw(std::string const &ou_fil);
 
-    class GridConvexHull {
-    public:
-        GridConvexHull() = default;
-        GridConvexHull(ConvexHull const &CH);
+    int _natoms{0};
+    Vector _orig_vtor{0.0f, 0.0f, 0.0f};
+    GridPoint *_xyz = nullptr, *_in_xyz = nullptr;
+    float *_radii = nullptr, *_in_radii = nullptr;
+};
 
-        ~GridConvexHull() {
-            free(_dots);
-        }
+class GridConvexHull {
+public:
+    GridConvexHull() = default;
+    GridConvexHull(ConvexHull const &CH);
 
-        void draw(std::string const &ou_fil);
-        
-        float *_dots = nullptr;
-    };
+    ~GridConvexHull() { free(_dots); }
 
-    class GridBool {
-    public:
-        GridBool() = default;
-        GridBool(ConvexHull const &CH);
+    void draw(std::string const &ou_fil);
 
-    };
-} //namespace GrANA
+    float *_dots = nullptr;
+};
+
+class GridBool {
+public:
+    GridBool() = default;
+    GridBool(ConvexHull const &CH);
+};
+} // namespace GrANA
 
 #endif // GrANA_GRID

@@ -1,0 +1,1 @@
+/usr/bin/c++     CMakeFiles/grana.dir/src/utils.cpp.o CMakeFiles/grana.dir/src/primitives.cpp.o CMakeFiles/grana.dir/src/continuous.cpp.o CMakeFiles/grana.dir/src/grid.cpp.o CMakeFiles/grana.dir/src/main.cpp.o  -o grana -lCGAL -lgmp -lmpfr /usr/local/lib/libfmt.a /home/pbarletta/chemfiles08/build/install/lib/libchemfiles.a -lnetcdf 
