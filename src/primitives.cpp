@@ -65,7 +65,7 @@ Cube::Cube(Point const p0, float const dim) {
 }
 
 // From CGAL Point.
-Cube::Cube(Point_3 const p0, float const dim) {
+Cube::Cube(CPoint const p0, float const dim) {
     _dim = dim;
     _p[0] = Point(p0);
     _p[1] = p0 + Vector(0.f, 0.f, _dim);
@@ -123,9 +123,9 @@ Prism::Prism(Point const &p0, Point const &p1, Point const &p2, Point const &p3,
 }
 
 // From CGAL Point
-Prism::Prism(Point_3 const &p0, Point_3 const &p1, Point_3 const &p2,
-    Point_3 const &p3, Point_3 const &p4, Point_3 const &p5, Point_3 const &p6,
-    Point_3 const &p7) {
+Prism::Prism(CPoint const &p0, CPoint const &p1, CPoint const &p2,
+    CPoint const &p3, CPoint const &p4, CPoint const &p5, CPoint const &p6,
+    CPoint const &p7) {
     _p[0] = Point(p0);
     _p[1] = Point(p1);
     _p[2] = Point(p2);

@@ -19,14 +19,10 @@ std::ostream &operator<<(std::ostream &stream, const GridPoint &p) {
 }
 
 // Turn a grid point into a continuous point, given the resolution.
+// This is not a constructor in the `Point` class to avoid circular
+// dependencies.
 Point GridPoint_to_point(const GridPoint &in_point) {
     return Point(grid_to_cont(in_point[0]), grid_to_cont(in_point[1]),
-        grid_to_cont(in_point[2]));
-}
-
-// Turn a grid point into a continuous point, given the resolution.
-GridPoint point_to_GridPoint(const Point &in_point) {
-    return GridPoint(grid_to_cont(in_point[0]), grid_to_cont(in_point[1]),
         grid_to_cont(in_point[2]));
 }
 
@@ -35,14 +31,14 @@ GridMolecule::GridMolecule(Molecule const &in_mol, Point const &orig_point) {
     _orig_vtor = point_to_vector(orig_point);
     _natoms = in_mol._natoms;
 
-    _xyz = (GridPoint *)malloc(sizeof(GridPoint) * _natoms * 3);
-    _in_xyz = (GridPoint *)malloc(sizeof(GridPoint) * _natoms * 3);
-    _radii = (float *)malloc(sizeof(float) * _natoms);
-    _in_radii = (float *)malloc(sizeof(float) * _natoms);
+    _xyz.reserve(_natoms * 3);
+    _in_xyz.reserve(_natoms * 3);
+    _radii.reserve(_natoms);
+    _in_radii.reserve(_natoms);
 
     for (int i = 0; i < _natoms; ++i) {
-        _xyz[i] = point_to_GridPoint(in_mol._xyz[i] - _orig_vtor);
-        _radii[i] = in_mol._radii[i];
+        _xyz.emplace_back(in_mol._xyz[i] - _orig_vtor);
+        _radii.push_back(in_mol._radii[i]);
     }
 }
 

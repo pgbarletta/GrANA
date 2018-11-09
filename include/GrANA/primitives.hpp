@@ -3,7 +3,7 @@
 
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 using EPIC = CGAL::Exact_predicates_inexact_constructions_kernel;
-using Point_3 = EPIC::Point_3;
+using CPoint = EPIC::Point_3;
 
 #include <array>
 #include <fmt/format.h>
@@ -74,7 +74,7 @@ public:
 
     Point(float const x, float const y, float const z) : _xyz{x, y, z} {}
 
-    Point(Point_3 const p) :
+    Point(CPoint const p) :
         _xyz{static_cast<float>(CGAL::to_double(p.x())),
             static_cast<float>(CGAL::to_double(p.y())),
             static_cast<float>(CGAL::to_double(p.z()))} {}
@@ -146,7 +146,7 @@ public:
         _p({p0, p1, p2}) {}
 
     // From CGAL Point
-    Triangle(Point_3 const &p0, Point_3 const &p1, Point_3 const &p2) :
+    Triangle(CPoint const &p0, CPoint const &p1, CPoint const &p2) :
         _p({Point(p0), Point(p1), Point(p2)}) {}
 
     Point operator[](int const idx) const { return _p[idx]; }
@@ -177,8 +177,8 @@ public:
         _p({p0, p1, p2, p3}) {}
 
     // From CGAL Point
-    Tetrahedron(Point_3 const &p0, Point_3 const &p1, Point_3 const &p2,
-        Point_3 const &p3) :
+    Tetrahedron(CPoint const &p0, CPoint const &p1, CPoint const &p2,
+        CPoint const &p3) :
         _p({Point(p0), Point(p1), Point(p2), Point(p3)}) {}
 
     Point operator[](int const idx) const { return _p[idx]; }
@@ -204,7 +204,7 @@ public:
     Cube(Point const p0, float const dim);
 
     // From CGAL Point.
-    Cube(Point_3 const p0, float const dim);
+    Cube(CPoint const p0, float const dim);
 
     // Draw cube.
     void draw(FILE *out_file, int const start_idx, int const resid);
@@ -223,9 +223,9 @@ public:
         Point const &p4, Point const &p5, Point const &p6, Point const &p7);
 
     // From CGAL Point
-    Prism(Point_3 const &p0, Point_3 const &p1, Point_3 const &p2,
-        Point_3 const &p3, Point_3 const &p4, Point_3 const &p5,
-        Point_3 const &p6, Point_3 const &p7);
+    Prism(CPoint const &p0, CPoint const &p1, CPoint const &p2,
+        CPoint const &p3, CPoint const &p4, CPoint const &p5, CPoint const &p6,
+        CPoint const &p7);
 
     Point &operator[](int const idx) { return _p[idx]; }
 

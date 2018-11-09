@@ -1,5 +1,7 @@
 #include "GrANA/continuous.hpp"
 
+#include <iostream>
+
 #include <CGAL/Delaunay_triangulation_3.h>
 using Delaunay = CGAL::Delaunay_triangulation_3<EPIC>;
 using Finite_cells_iterator = Delaunay::Finite_cells_iterator;
@@ -13,18 +15,17 @@ Molecule::Molecule(std::string const &in_filename) {
     auto in_xyz = in_frm.positions();
     _natoms = in_xyz.size();
 
-    _xyz = (Point *)malloc(sizeof(Point) * _natoms * 3);
-    _in_xyz = (Point *)malloc(sizeof(Point) * _natoms * 3);
-    _radii = (float *)malloc(sizeof(float) * _natoms);
-    _in_radii = (float *)malloc(sizeof(float) * _natoms);
-
+    _xyz.reserve(_natoms * 3);
+    _in_xyz.reserve(_natoms * 3);
+    _radii.reserve(_natoms);
+    _in_radii.reserve(_natoms);
     // Get atoms positions and VdW radii.
     int j = 0;
     for (const auto &residuo : in_top.residues()) {
         for (const auto &i : residuo) {
             const auto atom = in_xyz[i];
-            _xyz[i] = Point(atom[0], atom[1], atom[2]);
-            _radii[j] = in_top[i].vdw_radius().value_or(1.5);
+            _xyz.emplace_back(atom[0], atom[1], atom[2]);
+            _radii.push_back(in_top[i].vdw_radius().value_or(1.5));
             ++j;
         }
     }
@@ -57,12 +58,12 @@ ConvexHull::ConvexHull(Molecule const &prote, std::vector<int> const &indices) {
     // Turn CGAL's polyhedron holding the convex hull into GrANA triangles.
     P_Facet_const_iterator f_ite = con_hul.facets_begin();
     const P_Facet_const_iterator f_end = con_hul.facets_end();
-    _ntriangles = std::distance(f_ite, f_end);
-    _triangles = (Triangle *)malloc(sizeof(Triangle) * _ntriangles);
+    _ntriangles = static_cast<int>(std::distance(f_ite, f_end));
+    _triangles.reserve(_ntriangles);
 
     for (int i = 0; f_ite != f_end; ++f_ite) {
         P_Halfedge_around_facet_const_circulator he_ite = f_ite->facet_begin();
-        _triangles[i] = Triangle(he_ite->vertex()->point(),
+        _triangles.emplace_back(he_ite->vertex()->point(),
             (he_ite++)->vertex()->point(), (he_ite++)->vertex()->point());
         ++i;
     }
@@ -105,14 +106,10 @@ Triangulation::Triangulation(
 
     // Turn CGAL's Delaunay triangulation into GrANA triangulation.
     auto cell_ite = T.finite_cells_begin();
-    const auto cell_end = T.finite_cells_end();
-
-    _ntetrahedrons = std::distance(cell_ite, cell_end);
-    const int sz_t = sizeof(Tetrahedron) * _ntetrahedrons;
-    const int sz_c = sizeof(Cube) * _ntetrahedrons;
-
-    _tetrahedrons = (Tetrahedron *)malloc(sz_t);
-    _bboxes = (Cube *)malloc(sz_c);
+    auto const cell_end = T.finite_cells_end();
+    _ntetrahedrons = static_cast<int>(std::distance(cell_ite, cell_end));
+    _tetrahedrons.reserve(_ntetrahedrons);
+    _bboxes.reserve(_ntetrahedrons);
 
     // // Initialize bounding box.
     // constexpr float x = -999.0f;
@@ -122,13 +119,10 @@ Triangulation::Triangulation(
     // 	point(-x, y, -z), point(x, -y, -z), point(x, -y, z),
     // 	point(x, y, z), point(x, y, -z));
 
-    for (int i = 0; i < _ntetrahedrons; ++i) {
-        const auto p0 = cell_ite->vertex(0)->point();
-        const auto p1 = cell_ite->vertex(1)->point();
-        const auto p2 = cell_ite->vertex(2)->point();
-        const auto p3 = cell_ite->vertex(3)->point();
-        cell_ite++;
-        _tetrahedrons[i] = Tetrahedron(p0, p1, p2, p3);
+    for (; cell_ite != cell_end; ++cell_ite) {
+        _tetrahedrons.emplace_back(cell_ite->vertex(0)->point(),
+            cell_ite->vertex(1)->point(), cell_ite->vertex(2)->point(),
+            cell_ite->vertex(3)->point());
     }
 
     return;

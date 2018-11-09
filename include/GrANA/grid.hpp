@@ -49,19 +49,12 @@ public:
     GridMolecule() = default;
     GridMolecule(Molecule const &in_mol, Point const &orig_point);
 
-    ~GridMolecule() {
-        free(_xyz);
-        free(_in_xyz);
-        free(_radii);
-        free(_in_radii);
-    }
-
     void draw(std::string const &ou_fil);
 
     int _natoms{0};
     Vector _orig_vtor{0.0f, 0.0f, 0.0f};
-    GridPoint *_xyz = nullptr, *_in_xyz = nullptr;
-    float *_radii = nullptr, *_in_radii = nullptr;
+    std::vector<GridPoint> _xyz, _in_xyz;
+    std::vector<float> _radii, _in_radii;
 };
 
 class GridConvexHull {
@@ -69,11 +62,9 @@ public:
     GridConvexHull() = default;
     GridConvexHull(ConvexHull const &CH);
 
-    ~GridConvexHull() { free(_dots); }
-
     void draw(std::string const &ou_fil);
 
-    float *_dots = nullptr;
+    std::vector<float> _dots;
 };
 
 class GridBool {
