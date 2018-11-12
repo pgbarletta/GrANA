@@ -17,7 +17,7 @@ BraceWrapping:
     AfterClass: false
     AfterFunction: false
 
-AlwaysBreakTemplateDeclarations: Yes
+AlwaysBreakTemplateDeclarations: true
 BreakConstructorInitializers: AfterColon
 Cpp11BracedListStyle: true
 SpaceBeforeCpp11BracedList: false
