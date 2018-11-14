@@ -30,7 +30,6 @@ set(GRANA_FMT_DIR "" CACHE STRING
 set(GRANA_CHEMFILES_DIR "" CACHE STRING
 "Chemfiles installation folder. It should have an include and a lib folder.")
 
-
 set(SOURCE_DIR "${CMAKE_INSTALL_PREFIX}/src")
 set(INCLUDE_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/include")
 
@@ -49,48 +48,18 @@ src/main.cpp)
 
 add_executable(grana ${SOURCES})
 
-if(GRANA_CGAL_DIR STREQUAL "")
-    message("${Magenta}Trying to automatically locate CGAL library.${ColourReset}")
-    find_package(CGAL CONFIG REQUIRED)
-    target_link_libraries(grana PRIVATE CGAL)
-    target_link_libraries(grana PRIVATE gmp)
-    target_link_libraries(grana PRIVATE mpfr)
+message("${Magenta}Trying to automatically locate CGAL library.${ColourReset}")
+find_package(CGAL CONFIG REQUIRED)
+target_link_libraries(grana PRIVATE CGAL)
+target_link_libraries(grana PRIVATE gmp)
+target_link_libraries(grana PRIVATE mpfr)
 
-    if(CGAL_FOUND)
-        message("${Magenta}Found CGAL.${ColourReset}")
-    elseif(NOT CGAL_FOUND)
-        message("${Magenta}Could not found CGAL.${ColourReset}")
-    endif()
-else()
-    message("${Magenta}Not yet supported.${ColourReset}")
-endif()
+message("${Magenta}Building own chemfiles library.${ColourReset}")
+add_subdirectory(external/chemfiles EXCLUDE_FROM_ALL)
+target_link_libraries(grana PRIVATE chemfiles)
 
-
-if(GRANA_CHEMFILES_DIR STREQUAL "")
-    message("${Magenta}Building own chemfiles library.${ColourReset}")
-    add_subdirectory(external/chemfiles EXCLUDE_FROM_ALL)
-    target_link_libraries(grana PRIVATE chemfiles)
-else()
-    message("${Magenta}Looking for a chemfiles installation in ${GRANA_CHEMFILES_DIR}.${ColourReset}")
-    set(CMAKE_PREFIX_PATH ${GRANA_CHEMFILES_DIR})
-    find_library(chemfiles
-        NAMES chemfiles
-        HINT "${GRANA_CHEMFILES_DIR}/lib"
-    )
-    if(NOT chemfiles)
-        message(FATAL_ERROR "${Magenta}Chemfiles was not found in the provided path.${ColourReset}")
-    else()
-        message("${Magenta}Found Chemfiles!${ColourReset}")
-    endif()
-    target_link_libraries(grana PRIVATE ${chemfiles})
-endif()
-
-if(GRANA_FMT_DIR STREQUAL "")
-    message("${Magenta}Using chemfiles's fmt header-only library.${ColourReset}")
-    include_directories(build/external/chemfiles/external/fmt)
-else()
-    message("${Magenta}Not yet supported.${ColourReset}")
-endif()
+message("${Magenta}Using chemfiles's fmt header-only library.${ColourReset}")
+include_directories(build/external/chemfiles/external/fmt)
 
 target_include_directories(grana
     PUBLIC
