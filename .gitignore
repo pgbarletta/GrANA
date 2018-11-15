@@ -53,3 +53,4 @@ Thumbs.db
 *.out
 CMakeFiles/
 build/grana
+CMakeCache.txt
