@@ -4,15 +4,6 @@ project(grana VERSION 0.1.0 LANGUAGES CXX)
 ###################################################################
 if(NOT WIN32)
   string(ASCII 27 Esc)
-  set(ColourReset "${Esc}[m")
-  set(ColourBold  "${Esc}[1m")
-  set(Red         "${Esc}[31m")
-  set(Green       "${Esc}[32m")
-  set(Yellow      "${Esc}[33m")
-  set(Blue        "${Esc}[34m")
-  set(Magenta     "${Esc}[35m")
-  set(Cyan        "${Esc}[36m")
-  set(White       "${Esc}[37m")
   set(BoldRed     "${Esc}[1;31m")
   set(BoldGreen   "${Esc}[1;32m")
   set(BoldYellow  "${Esc}[1;33m")
@@ -23,32 +14,23 @@ if(NOT WIN32)
 endif()
 ###################################################################
 
-set(GRANA_CGAL_DIR "" CACHE STRING
-"CGAL installation folder.")
-set(GRANA_FMT_DIR "" CACHE STRING
-"fmt installation folder.")
-set(GRANA_CHEMFILES_DIR "" CACHE STRING
-"Chemfiles installation folder. It should have an include and a lib folder.")
+set(GRANA_CGAL_DIR "" CACHE STRING "CGAL installation folder.")
 
-set(SOURCE_DIR "${CMAKE_INSTALL_PREFIX}/src")
-set(INCLUDE_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/include")
+add_executable(grana "")
+target_sources(grana
+    PRIVATE
+        src/main.cpp
+        src/utils.cpp
+        src/primitives.cpp
+        src/continuous.cpp
+        src/grid.cpp
+        include/GrANA/utils.hpp
+        include/GrANA/primitives.hpp
+        include/GrANA/continuous.hpp
+        include/GrANA/grid.hpp
+)
 
-set(INCLUDES
-    include/grana/utils.hpp
-    include/grana/primitives.hpp
-    include/grana/continuous.hpp
-    include/grana/grid.hpp
-include/grana/main.hpp)
-set(SOURCES
-    src/utils.cpp
-    src/primitives.cpp
-    src/continuous.cpp
-    src/grid.cpp
-src/main.cpp)
-
-add_executable(grana ${SOURCES})
-
-message("${Magenta}Trying to automatically locate CGAL library.${ColourReset}")
+message("${Magenta}Trying to automatically locate CGAL, gmp and mpfr libraries.${ColourReset}")
 find_package(CGAL CONFIG REQUIRED)
 target_link_libraries(grana PRIVATE CGAL)
 target_link_libraries(grana PRIVATE gmp)
@@ -62,11 +44,9 @@ message("${Magenta}Using chemfiles's fmt header-only library.${ColourReset}")
 include_directories(build/external/chemfiles/external/fmt)
 
 target_include_directories(grana
-    PUBLIC
-        $<INSTALL_INTERFACE:include>
     PRIVATE
+        $<INSTALL_INTERFACE:include>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        /home/pbarletta/chemfiles08/build/install/include
 )
 
 target_compile_options(grana PRIVATE -Wall)
