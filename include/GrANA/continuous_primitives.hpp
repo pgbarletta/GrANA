@@ -1,11 +1,10 @@
-#ifndef GrANA_PRIMITIVES_H
-#define GrANA_PRIMITIVES_H
+#ifndef GrANA_CONTINUOUS_PRIMITIVES_H
+#define GrANA_CONTINUOUS_PRIMITIVES_H
 
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 using EPIC = CGAL::Exact_predicates_inexact_constructions_kernel;
 using CPoint = EPIC::Point_3;
 
-#include <array>
 #include <fmt/format.h>
 
 namespace GrANA {
@@ -66,6 +65,16 @@ inline float norm(Vector const &v) {
     const float dy = v[1] - v.get_oy();
     const float dz = v[2] - v.get_oz();
     return std::sqrt(dx * dx + dy * dy + dz * dz);
+}
+
+inline auto determinant(Vector const &v0, Vector const &v1, Vector const &v2)
+    -> float {
+    // First, compute the det2x2.
+    float const m01 = v0[0] * v1[1] - v0[1] * v1[0];
+    float const m02 = v0[0] * v2[1] - v0[1] * v2[0];
+    float const m12 = v1[0] * v2[1] - v1[1] * v2[0];
+    // Now compute the minors of rank 3.
+    return m01 * v2[2] - m02 * v1[2] + m12 * v0[2];
 }
 
 class Point {
@@ -131,113 +140,5 @@ inline float distance(Point const &p0, Point const &p1) {
     float const dz = p0[2] - p1[2];
     return std::sqrt(dx * dx + dy * dy + dz * dz);
 }
-
-class Triangle {
-public:
-    Triangle() = default;
-
-    Triangle(float const x0, float const y0, float const z0, float const x1,
-        float const y1, float const z1, float const x2, float const y2,
-        float const z2) :
-        _p({Point(x0, y0, z0), Point(x1, y1, z1), Point(x2, y2, z2)}) {}
-
-    // From GrANA::Point
-    Triangle(Point const &p0, Point const &p1, Point const &p2) :
-        _p({p0, p1, p2}) {}
-
-    // From CGAL Point
-    Triangle(CPoint const &p0, CPoint const &p1, CPoint const &p2) :
-        _p({Point(p0), Point(p1), Point(p2)}) {}
-
-    Point operator[](int const idx) const { return _p[idx]; }
-
-    // Draw triangle.
-    void draw(FILE *out_file, int const start_idx, int const resid);
-
-    std::array<Point, 3> _p;
-};
-
-inline std::ostream &operator<<(std::ostream &stream, const Triangle &t) {
-    stream << t._p[0] << "\t" << t._p[1] << "\t" << t._p[2];
-    return stream;
-}
-
-class Tetrahedron {
-public:
-    Tetrahedron() = default;
-    Tetrahedron(float const x0, float const y0, float const z0, float const x1,
-        float const y1, float const z1, float const x2, float const y2,
-        float const z2, float const x3, float const y3, float const z3) :
-        _p({Point(x0, y0, z0), Point(x1, y1, z1), Point(x2, y2, z2),
-            Point(x3, y3, z3)}) {}
-
-    // From GrANA::Point
-    Tetrahedron(
-        Point const &p0, Point const &p1, Point const &p2, Point const &p3) :
-        _p({p0, p1, p2, p3}) {}
-
-    // From CGAL Point
-    Tetrahedron(CPoint const &p0, CPoint const &p1, CPoint const &p2,
-        CPoint const &p3) :
-        _p({Point(p0), Point(p1), Point(p2), Point(p3)}) {}
-
-    Point operator[](int const idx) const { return _p[idx]; }
-
-    // Draw tetrahedron.
-    void draw(FILE *out_file, int const start_idx, int const resid);
-
-    std::array<Point, 4> _p;
-};
-
-inline std::ostream &operator<<(std::ostream &stream, Tetrahedron const &t) {
-    stream << t._p[0] << "\t" << t._p[1] << "\t" << t._p[2] << "\t" << t._p[3];
-    return stream;
-}
-
-class Cube {
-public:
-    Cube() = default;
-
-    Cube(float const p0x, float const p0y, float const p0z, float const dim);
-
-    // From GrANA::Point.
-    Cube(Point const p0, float const dim);
-
-    // From CGAL Point.
-    Cube(CPoint const p0, float const dim);
-
-    // Draw cube.
-    void draw(FILE *out_file, int const start_idx, int const resid);
-
-    std::array<Point, 8> _p;
-    float _dim;
-};
-std::ostream &operator<<(std::ostream &stream, Cube const &t);
-
-class Prism {
-public:
-    Prism() = default;
-
-    // From GrANA::Point
-    Prism(Point const &p0, Point const &p1, Point const &p2, Point const &p3,
-        Point const &p4, Point const &p5, Point const &p6, Point const &p7);
-
-    // From CGAL Point
-    Prism(CPoint const &p0, CPoint const &p1, CPoint const &p2,
-        CPoint const &p3, CPoint const &p4, CPoint const &p5, CPoint const &p6,
-        CPoint const &p7);
-
-    Point &operator[](int const idx) { return _p[idx]; }
-
-    // Draw prism.
-    void draw(FILE *out_file, int const start_idx, int const resid);
-
-    std::array<Point, 8> _p;
-};
-std::ostream &operator<<(std::ostream &stream, Prism const &t);
-
-auto determinant(Vector const &v0, Vector const &v1, Vector const &v2) -> float;
-auto determinant(Tetrahedron const &t) -> float;
-
 }
 #endif // _H

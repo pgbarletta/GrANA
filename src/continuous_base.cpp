@@ -1,4 +1,4 @@
-#include "GrANA/primitives.hpp"
+#include "GrANA/continuous_base.hpp"
 
 namespace GrANA {
 // Draw triangle.
@@ -64,21 +64,6 @@ Cube::Cube(Point const p0, float const dim) {
     return;
 }
 
-// From CGAL Point.
-Cube::Cube(CPoint const p0, float const dim) {
-    _dim = dim;
-    _p[0] = Point(p0);
-    _p[1] = p0 + Vector(0.f, 0.f, _dim);
-    _p[2] = p0 + Vector(0.f, _dim, _dim);
-    _p[3] = p0 + Vector(0.f, _dim, 0.f);
-    _p[4] = p0 + Vector(_dim, 0.f, 0.f);
-    _p[5] = p0 + Vector(_dim, 0.f, _dim);
-    _p[6] = p0 + Vector(_dim, _dim, _dim);
-    _p[7] = p0 + Vector(_dim, _dim, 0.f);
-
-    return;
-}
-
 // Draw cube.
 void Cube::draw(FILE *out_file, int const start_idx, int const resid) {
     const auto i = start_idx;
@@ -122,22 +107,6 @@ Prism::Prism(Point const &p0, Point const &p1, Point const &p2, Point const &p3,
     return;
 }
 
-// From CGAL Point
-Prism::Prism(CPoint const &p0, CPoint const &p1, CPoint const &p2,
-    CPoint const &p3, CPoint const &p4, CPoint const &p5, CPoint const &p6,
-    CPoint const &p7) {
-    _p[0] = Point(p0);
-    _p[1] = Point(p1);
-    _p[2] = Point(p2);
-    _p[3] = Point(p3);
-    _p[4] = Point(p4);
-    _p[5] = Point(p5);
-    _p[6] = Point(p6);
-    _p[7] = Point(p7);
-
-    return;
-}
-
 // Draw prism. Can't draw connectivity properly if the prism wasn't constructed
 // with proper Point ordering. SO this class is kind of useless.
 void Prism::draw(FILE *out_file, int const start_idx, int const resid) {
@@ -166,22 +135,4 @@ void Prism::draw(FILE *out_file, int const start_idx, int const resid) {
 
     return;
 }
-
-auto determinant(Vector const &v0, Vector const &v1, Vector const &v2)
-    -> float {
-    // First, compute the det2x2.
-    float const m01 = v0[0] * v1[1] - v0[1] * v1[0];
-    float const m02 = v0[0] * v2[1] - v0[1] * v2[0];
-    float const m12 = v1[0] * v2[1] - v1[1] * v2[0];
-    // Now compute the minors of rank 3.
-    return m01 * v2[2] - m02 * v1[2] + m12 * v0[2];
-}
-
-auto determinant(Tetrahedron const &t) -> float {
-    Vector const v10 = t[1] - t[0];
-    Vector const v20 = t[2] - t[0];
-    Vector const v30 = t[3] - t[0];
-    return determinant(v10, v20, v30);
-}
-
 }

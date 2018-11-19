@@ -21,11 +21,12 @@ target_sources(grana
     PRIVATE
         src/main.cpp
         src/utils.cpp
-        src/primitives.cpp
+        src/continuous_base.cpp
         src/continuous.cpp
         src/grid.cpp
         include/GrANA/utils.hpp
-        include/GrANA/primitives.hpp
+        include/GrANA/continuous_primitives.hpp
+        include/GrANA/continuous_base.hpp
         include/GrANA/continuous.hpp
         include/GrANA/grid.hpp
 )

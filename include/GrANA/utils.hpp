@@ -12,14 +12,12 @@ extern float rsltion;
 namespace GrANA {
 
 // Turn a coordinate in the matching matrix grid index.
-inline int32_t cont_to_grid(float x) {
-    return static_cast<int32_t>(fabs(x - fmod(x, rsltion)) / rsltion);
+inline int cont_to_grid(float x) {
+    return static_cast<int>(fabs(x - fmod(x, rsltion)) / rsltion);
 }
 
 // Turn a grid index into a xyz coordinate.
-inline float grid_to_cont(int32_t idx) {
-    return static_cast<float>(idx * rsltion);
-}
+inline float grid_to_cont(int idx) { return static_cast<float>(idx * rsltion); }
 
 // Helper function for getting the indices that sort a cont_vector.
 template <typename T>

@@ -14,7 +14,7 @@ using EPIC = CGAL::Exact_predicates_inexact_constructions_kernel;
 using CPoint = EPIC::Point_3;
 using Polyhedron = CGAL::Polyhedron_3<EPIC>;
 
-#include "GrANA/primitives.hpp"
+#include "GrANA/continuous_base.hpp"
 #include "GrANA/utils.hpp"
 #include "chemfiles.hpp"
 

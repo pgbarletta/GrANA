@@ -13,7 +13,7 @@ namespace GrANA {
 
 class GridPoint {
 public:
-    using grid_idx_t = int32_t;
+    using grid_idx_t = int;
 
     GridPoint() = default;
 
@@ -25,7 +25,7 @@ public:
         _xyz{cont_to_grid(p[0]), cont_to_grid(p[1]), cont_to_grid(p[2])} {}
 
     // Draw GridPoint as atom.
-    void draw(FILE *ou_fil, int idx, int resid);
+    void draw(FILE *ou_fil, int idx, int resid, Vector const &orig_vtor);
 
     grid_idx_t &operator[](int idx) { return _xyz[idx]; }
     grid_idx_t operator[](int idx) const { return _xyz[idx]; }
@@ -33,7 +33,9 @@ public:
 private:
     std::array<grid_idx_t, 3> _xyz;
 };
+
 std::ostream &operator<<(std::ostream &stream, const GridPoint &t);
+
 // Turn a grid point into a continuous point, given the resolution.
 Point GridPoint_to_point(const GridPoint &in_point);
 
@@ -56,6 +58,19 @@ public:
     std::vector<GridPoint> _xyz, _in_xyz;
     std::vector<float> _radii, _in_radii;
 };
+
+// class GridTriangulation {
+// public:
+//     GridTriangulation() = default;
+
+//     GridTriangulation(Triangulation const &T, Point const &orig_point);
+
+//     void draw(const std::string &out_file);
+
+//     int _ntetrahedrons;
+//     std::vector<GridTetrahedron> _tetrahedrons;
+//     std::vector<GridCube> _bboxes;
+// };
 
 class GridConvexHull {
 public:

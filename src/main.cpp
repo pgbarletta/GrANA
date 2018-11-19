@@ -30,5 +30,9 @@ int main(int argc, char **argv) {
 
     incl_area.draw("aux/ia.pdb");
 
+    GrANA::GridMolecule Gprote(prote, GrANA::Point(-45.0f, 0.0f, -45.0f));
+
+    Gprote.draw("aux/g1mtn.pdb");
+
     return 0;
 }
