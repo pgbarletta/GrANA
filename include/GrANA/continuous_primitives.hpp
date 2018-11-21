@@ -89,7 +89,7 @@ public:
             static_cast<float>(CGAL::to_double(p.z()))} {}
 
     // Draw atom.
-    void draw(FILE *out_file, int const idx, int const resid) {
+    void draw(FILE *out_file, int const idx, int const resid) const {
         fmt::print(out_file,
             "{: <6}{: >5} {: <4s} {:3} {:1}{: >4}    "
             "{:8.3f}{:8.3f}{:8.3f}{:6.2f}{:6.2f}          {: >2s}\n",

@@ -38,8 +38,10 @@ public:
     void draw(std::string const &out_file);
 
     int _natoms;
-    std::vector<Point> _xyz, _in_xyz;
-    std::vector<float> _radii, _in_radii;
+    std::vector<float> _x;
+    std::vector<float> _y;
+    std::vector<float> _z;
+    std::vector<float> _radii;
 };
 
 class ConvexHull {
@@ -96,11 +98,13 @@ inline std::vector<CPoint> atom_indices_to_points(
     point_set.reserve(sz);
 
     for (std::size_t i = 0; i < sz; ++i) {
-        auto const xyz = prote._xyz[indices[i] - 1];
-        point_set.emplace_back(xyz[0], xyz[1], xyz[2]);
+        auto const x = prote._x[indices[i] - 1];
+        auto const y = prote._y[indices[i] - 1];
+        auto const z = prote._z[indices[i] - 1];
+        point_set.emplace_back(x, y, z);
     }
     return point_set;
 }
-} // namespace
+} // namespace GrANA
 
 #endif // _H

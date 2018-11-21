@@ -1,62 +1,47 @@
 #ifndef GrANA_GRID
 #define GrANA_GRID
 
-#include "GrANA/continuous.hpp"
-#include "GrANA/utils.hpp"
-#include <array>
-#include <fmt/format.h>
-#include <fstream>
-#include <iostream>
-#include <string>
+#include "GrANA/grid_base.hpp"
+#include "utils.hpp"
+#include <tuple>
 
 namespace GrANA {
 
-class GridPoint {
-public:
-    using grid_idx_t = int;
-
-    GridPoint() = default;
-
-    GridPoint(
-        const grid_idx_t x, const grid_idx_t y, const grid_idx_t z) noexcept :
-        _xyz{x, y, z} {}
-
-    GridPoint(const Point &p) noexcept :
-        _xyz{cont_to_grid(p[0]), cont_to_grid(p[1]), cont_to_grid(p[2])} {}
-
-    // Draw GridPoint as atom.
-    void draw(FILE *ou_fil, int idx, int resid, Vector const &orig_vtor);
-
-    grid_idx_t &operator[](int idx) { return _xyz[idx]; }
-    grid_idx_t operator[](int idx) const { return _xyz[idx]; }
-
-private:
-    std::array<grid_idx_t, 3> _xyz;
-};
-
-std::ostream &operator<<(std::ostream &stream, const GridPoint &t);
-
-// Turn a grid point into a continuous point, given the resolution.
-Point GridPoint_to_point(const GridPoint &in_point);
-
-// Turn a grid point into a continuous point, given the resolution.
-GridPoint point_to_GridPoint(const Point &in_point);
-
 class GridMolecule {
 public:
-    // GridMolecule() noexcept : _natoms(0), _orig_vtor(Vector(0.0f, 0.0f,
-    // 0.0f)),
-    //     _xyz(nullptr), _in_xyz(nullptr), _radii(nullptr), _in_radii(nullptr)
-    //     {};
     GridMolecule() = default;
-    GridMolecule(Molecule const &in_mol, Point const &orig_point);
+    GridMolecule(Molecule const &in_mol) :
+        _idx_x(sort_indices(in_mol._x)), _idx_y(sort_indices(in_mol._y)),
+        _idx_z(sort_indices(in_mol._z)), _natoms(in_mol._natoms) {
+
+        _orig_vtor = Vector(std::floor(in_mol._x[_idx_x[0]]),
+            std::floor(in_mol._y[_idx_y[0]]), std::floor(in_mol._z[_idx_z[0]]));
+
+        _x.reserve(_natoms * 3);
+        _y.reserve(_natoms * 3);
+        _z.reserve(_natoms * 3);
+        _radii.reserve(_natoms);
+
+        for (int i = 0; i < _natoms; ++i) {
+            _x.push_back(cont_to_grid(in_mol._x[i] - _orig_vtor[0]));
+            _y.push_back(cont_to_grid(in_mol._y[i] - _orig_vtor[1]));
+            _z.push_back(cont_to_grid(in_mol._z[i] - _orig_vtor[2]));
+            _radii.push_back(in_mol._radii[i]);
+        }
+    }
 
     void draw(std::string const &ou_fil);
 
-    int _natoms{0};
+    std::vector<int> const _idx_x;
+    std::vector<int> const _idx_y;
+    std::vector<int> const _idx_z;
+    int const _natoms;
     Vector _orig_vtor{0.0f, 0.0f, 0.0f};
-    std::vector<GridPoint> _xyz, _in_xyz;
-    std::vector<float> _radii, _in_radii;
+    std::vector<grid_t> _x;
+    std::vector<grid_t> _y;
+    std::vector<grid_t> _z;
+    std::vector<float> _radii;
+    // Indices that sort the atoms along the 3 axes.
 };
 
 // class GridTriangulation {
@@ -87,6 +72,10 @@ public:
     GridBool() = default;
     GridBool(ConvexHull const &CH);
 };
+
+void fill_grid_tetrahedron(std::vector<grid_t> i_x, std::vector<grid_t> g_x,
+    std::vector<grid_t> g_y, std::vector<grid_t> g_z, std::vector<float> radii);
+
 } // namespace GrANA
 
 #endif // GrANA_GRID

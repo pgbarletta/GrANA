@@ -24,10 +24,13 @@ target_sources(grana
         src/continuous_base.cpp
         src/continuous.cpp
         src/grid.cpp
+        src/grid_base.cpp
         include/GrANA/utils.hpp
         include/GrANA/continuous_primitives.hpp
         include/GrANA/continuous_base.hpp
         include/GrANA/continuous.hpp
+        include/GrANA/grid_primitives.hpp
+        include/GrANA/grid_base.hpp
         include/GrANA/grid.hpp
 )
 

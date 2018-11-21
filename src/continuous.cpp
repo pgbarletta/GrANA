@@ -15,16 +15,19 @@ Molecule::Molecule(std::string const &in_filename) {
     auto in_xyz = in_frm.positions();
     _natoms = in_xyz.size();
 
-    _xyz.reserve(_natoms * 3);
-    _in_xyz.reserve(_natoms * 3);
+    _x.reserve(_natoms * 3);
+    _y.reserve(_natoms * 3);
+    _z.reserve(_natoms * 3);
     _radii.reserve(_natoms);
-    _in_radii.reserve(_natoms);
+
     // Get atoms positions and VdW radii.
     int j = 0;
     for (const auto &residuo : in_top.residues()) {
         for (const auto &i : residuo) {
-            const auto atom = in_xyz[i];
-            _xyz.emplace_back(atom[0], atom[1], atom[2]);
+            const auto atom_xyz = in_xyz[i];
+            _x.push_back(static_cast<float>(atom_xyz[0]));
+            _y.push_back(static_cast<float>(atom_xyz[1]));
+            _z.push_back(static_cast<float>(atom_xyz[2]));
             _radii.push_back(in_top[i].vdw_radius().value_or(1.5));
             ++j;
         }
@@ -36,8 +39,9 @@ void Molecule::draw(std::string const &out_file) {
 
     FILE *file = std::fopen(out_file.c_str(), "w");
     if (file) {
-        for (int i = 1; i <= _natoms; ++i) {
-            _xyz[i - 1].draw(file, i, i);
+        for (int i = 0; i <= _natoms - 1; ++i) {
+            Point const atm(_x[i], _y[i], _z[i]);
+            atm.draw(file, i + 1, i + 1);
         }
     } else {
         std::cerr << "Could not open " << out_file << ". " << '\n';

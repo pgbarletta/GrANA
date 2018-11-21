@@ -1,59 +1,66 @@
 #include "GrANA/grid.hpp"
 namespace GrANA {
 
-// Draw GridPoint as atom.
-void GridPoint::draw(
-    FILE *ou_fil, int idx, int resid, Vector const &orig_vtor) {
-    float const fx = grid_to_cont(_xyz[0]) + orig_vtor[0];
-    float const fy = grid_to_cont(_xyz[1]) + orig_vtor[1];
-    float const fz = grid_to_cont(_xyz[2]) + orig_vtor[2];
-    fmt::print(ou_fil,
-        "{: <6}{: >5} {: <4s} {:3} {:1}{: >4}    "
-        "{:8.3f}{:8.3f}{:8.3f}{:6.2f}{:6.2f}          {: >2s}\n",
-        "HETATM", idx, "H", "GPU", "A", resid, fx, fy, fz, 1.0, 0.0, "H");
-    return;
-}
-
-std::ostream &operator<<(std::ostream &stream, const GridPoint &p) {
-    stream << p[0] << " " << p[1] << " " << p[2];
-    return stream;
-}
-
-// Turn a grid point into a continuous point, given the resolution.
-// This is not a constructor in the `Point` class to avoid circular
-// dependencies.
-Point GridPoint_to_point(GridPoint const &in_point) {
-    return Point(grid_to_cont(in_point[0]), grid_to_cont(in_point[1]),
-        grid_to_cont(in_point[2]));
-}
-
-GridMolecule::GridMolecule(Molecule const &in_mol, Point const &orig_point) {
-
-    _orig_vtor = point_to_vector(orig_point);
-    _natoms = in_mol._natoms;
-
-    _xyz.reserve(_natoms * 3);
-    _in_xyz.reserve(_natoms * 3);
-    _radii.reserve(_natoms);
-    _in_radii.reserve(_natoms);
-
-    for (int i = 0; i < _natoms; ++i) {
-        _xyz.emplace_back(in_mol._xyz[i] - _orig_vtor);
-        _radii.push_back(in_mol._radii[i]);
-    }
-}
-
 void GridMolecule::draw(std::string const &ou_fil) {
 
     FILE *file = std::fopen(ou_fil.c_str(), "w");
     if (file) {
-        for (int i = 1; i <= _natoms; ++i) {
-            _xyz[i - 1].draw(file, i, i, _orig_vtor);
+        for (int i = 0; i <= _natoms - 1; ++i) {
+            GridPoint const atm(_x[i], _y[i], _z[i]);
+            atm.draw(file, i + 1, i + 1, _orig_vtor);
         }
     } else {
         std::cerr << "Could not open " << ou_fil << ". " << '\n';
     }
     std::fclose(file);
+    return;
+}
+
+void fill_grid_tetrahedron(std::vector<grid_t> i_x, std::vector<grid_t> g_x,
+    std::vector<grid_t> g_y, std::vector<grid_t> g_z,
+    std::vector<float> radii) {
+    constexpr float sq = 1.4142f;
+
+    // grid_t const x0 = g_x[i_x[0]];
+    // grid_t const y0 = g_y[i_x[0]];
+    // grid_t const z0 = g_z[i_x[0]];
+
+    // grid_t const x1 = g_x[i_x[1]];
+    // grid_t const y1 = g_y[i_x[1]];
+    // grid_t const z1 = g_z[i_x[1]];
+
+    // grid_t const x2 = g_x[i_x[2]];
+    // grid_t const y2 = g_y[i_x[2]];
+    // grid_t const z2 = g_z[i_x[2]];
+
+    // grid_t const x3 = g_x[i_x[3]];
+    // grid_t const y3 = g_y[i_x[3]];
+    // grid_t const z3 = g_z[i_x[3]];
+
+    // grid_t const x01 = std::fabs(x2 - x1);
+    // grid_t const y01 = std::fabs(y2 - y1);
+    // grid_t const z01 = std::fabs(z2 - z1);
+
+    // grid_t const x02 = std::fabs(x2 - x0);
+    // grid_t const y02 = std::fabs(y2 - y0);
+    // grid_t const z02 = std::fabs(z2 - z0);
+
+    // grid_t const x03 = std::fabs(x3 - x0);
+    // grid_t const y03 = std::fabs(y3 - y0);
+    // grid_t const z03 = std::fabs(z3 - z0);
+
+    // grid_t const x12 = std::fabs(x2 - x1);
+    // grid_t const y12 = std::fabs(y2 - y1);
+    // grid_t const z12 = std::fabs(z2 - z1);
+
+    // grid_t const x13 = std::fabs(x3 - x1);
+    // grid_t const y13 = std::fabs(y3 - y1);
+    // grid_t const z13 = std::fabs(z3 - z1);
+
+    // grid_t const x23 = std::fabs(x3 - x2);
+    // grid_t const y23 = std::fabs(y3 - y2);
+    // grid_t const z23 = std::fabs(z3 - z2);
+
     return;
 }
 

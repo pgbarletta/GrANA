@@ -1,4 +1,5 @@
 float rsltion = .1;
+#include <cmath>
 #include <stdexcept>
 #include <string>
 #include <typeinfo>
@@ -27,12 +28,15 @@ int main(int argc, char **argv) {
     GrANA::Molecule prote(argv[2]);
 
     GrANA::Triangulation incl_area(prote, indices);
-
     incl_area.draw("aux/ia.pdb");
 
-    GrANA::GridMolecule Gprote(prote, GrANA::Point(-45.0f, 0.0f, -45.0f));
-
+    GrANA::GridMolecule Gprote(prote);
     Gprote.draw("aux/g1mtn.pdb");
+
+    GrANA::fill_grid_tetrahedron(
+        Gprote._idx_x, Gprote._x, Gprote._y, Gprote._z, Gprote._radii);
+
+    // for (auto const &each : i_x)
 
     return 0;
 }
