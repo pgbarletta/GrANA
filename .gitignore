@@ -54,3 +54,4 @@ Thumbs.db
 CMakeFiles/
 build/grana
 CMakeCache.txt
+*ninja*
