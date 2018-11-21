@@ -1,6 +1,24 @@
 #include "GrANA/utils.hpp"
 namespace GrANA {
 
+// Read input.
+auto get_input(int argc, char **argv)
+    -> std::tuple<std::string, std::string, float> {
+
+    float r = .1f;
+    try {
+        if (argc != 4) {
+            throw std::invalid_argument(
+                "Usage: GrANA resolution in_pdb out_pdb\n");
+        }
+        resolution = std::stof(argv[1]);
+    } catch (...) {
+        std::terminate();
+    }
+
+    return {argv[1], argv[1], r};
+}
+
 // Helper function to get the indices of the true elements of a bool array.
 // Optimized for large (>500) and sparse bool arrays.
 auto get_indices_from_sparse_bool_array(

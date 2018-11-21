@@ -14,11 +14,13 @@ using grid_t = int;
 
 // Turn a coordinate in the matching matrix grid index.
 inline grid_t cont_to_grid(float x) {
-    return static_cast<grid_t>(fabs(x - fmod(x, rsltion)) / rsltion);
+    return static_cast<grid_t>(fabs(x - fmod(x, resolution)) / resolution);
 }
 
 // Turn a grid index into a xyz coordinate.
-inline float grid_to_cont(int idx) { return static_cast<float>(idx * rsltion); }
+inline float grid_to_cont(int idx) {
+    return static_cast<float>(idx * resolution);
+}
 
 class GridPoint {
 public:

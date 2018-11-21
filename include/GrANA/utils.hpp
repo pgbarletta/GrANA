@@ -5,11 +5,17 @@
 #include <cmath>
 #include <iterator>
 #include <numeric>
+#include <stdexcept>
+#include <tuple>
 #include <vector>
 
-extern float rsltion;
+extern float resolution;
 
 namespace GrANA {
+
+// Read input.
+auto get_input(int argc, char **argv)
+    -> std::tuple<std::string, std::string, float>;
 
 // Helper function for getting the indices that sort a vector.
 template <typename T>

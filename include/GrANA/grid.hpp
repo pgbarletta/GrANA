@@ -73,8 +73,7 @@ public:
     GridBool(ConvexHull const &CH);
 };
 
-void fill_grid_tetrahedron(std::vector<grid_t> i_x, std::vector<grid_t> g_x,
-    std::vector<grid_t> g_y, std::vector<grid_t> g_z, std::vector<float> radii);
+void fill_grid_tetrahedron(GridMolecule const &in_mol);
 
 } // namespace GrANA
 
