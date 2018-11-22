@@ -16,15 +16,23 @@ int main(int argc, char **argv) {
     std::vector<int> indices = {
         300, 600, 900, 1200, 1500, 1800, 1240, 400, 500, 700, 800, 1000, 1100};
 
-    GrANA::Molecule prote(argv[2]);
+    GrANA::Molecule prote(in_pdb);
 
     GrANA::Triangulation incl_area(prote, indices);
-    incl_area.draw("aux/ia.pdb");
+    incl_area.draw(out_pdb);
 
     GrANA::GridMolecule Gprote(prote);
     Gprote.draw("aux/g1mtn.pdb");
 
     GrANA::fill_grid_tetrahedron(Gprote);
+
+    printf("_x_min: %i\n", Gprote._x_min);
+    printf("_y_min: %i\n", Gprote._y_min);
+    printf("_z_min: %i\n", Gprote._z_min);
+
+    printf("_x_max: %i\n", Gprote._x_max);
+    printf("_y_max: %i\n", Gprote._y_max);
+    printf("_z_max: %i\n", Gprote._z_max);
 
     return 0;
 }

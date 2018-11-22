@@ -16,7 +16,7 @@ auto get_input(int argc, char **argv)
         std::terminate();
     }
 
-    return {argv[1], argv[1], r};
+    return {argv[2], argv[3], r};
 }
 
 // Helper function to get the indices of the true elements of a bool array.
