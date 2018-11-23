@@ -55,3 +55,6 @@ CMakeFiles/
 build/grana
 CMakeCache.txt
 *ninja*
+as
+sa
+*.nc

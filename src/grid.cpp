@@ -31,8 +31,8 @@ auto fill_grid_tetrahedron(GridMolecule const &in_mol, float const resolution)
 
         // Atom VdW radius, inner square dimension and their difference.
         grid_t const radius =
-            static_cast<grid_t>(in_mol._radii[ii] / resolution);
-        grid_t const is = static_cast<grid_t>(radius * isqrt);
+            static_cast<grid_t>(std::floor(in_mol._radii[ii] / resolution));
+        grid_t const is = static_cast<grid_t>(std::floor(radius * isqrt));
         [[maybe_unused]] grid_t const leftover = radius - is;
 
         for (grid_t k = -is; k <= is; ++k) {
@@ -45,8 +45,6 @@ auto fill_grid_tetrahedron(GridMolecule const &in_mol, float const resolution)
                         ix < in_mol._x_max and iy < in_mol._y_max and
                         iz < in_mol._z_max) {
                         mtx[iz][iy][ix] = 1;
-
-                        // printf("ix: %i iy: %i iz: %i \n", ix, iy, iz);
                     }
                 }
             }

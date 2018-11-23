@@ -23,13 +23,13 @@ int main(int argc, char **argv) {
     GrANA::GridMolecule Gprote(prote, resolution);
     Gprote.draw("aux/g1mtn.pdb", resolution);
 
-    printf("_x_min: %i\n", Gprote._x_min);
-    printf("_y_min: %i\n", Gprote._y_min);
-    printf("_z_min: %i\n", Gprote._z_min);
+    // printf("_x_min: %i\n", Gprote._x_min);
+    // printf("_y_min: %i\n", Gprote._y_min);
+    // printf("_z_min: %i\n", Gprote._z_min);
 
-    printf("_x_max: %i\n", Gprote._x_max);
-    printf("_y_max: %i\n", Gprote._y_max);
-    printf("_z_max: %i\n", Gprote._z_max);
+    // printf("_x_max: %i\n", Gprote._x_max);
+    // printf("_y_max: %i\n", Gprote._y_max);
+    // printf("_z_max: %i\n", Gprote._z_max);
 
     auto mtx = GrANA::fill_grid_tetrahedron(Gprote, resolution);
     draw(out_pdb, mtx, Gprote._orig_vtor, resolution);
