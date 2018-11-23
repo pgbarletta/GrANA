@@ -6,13 +6,12 @@
 #include <limits>
 #include <tuple>
 
-extern float resolution;
 namespace GrANA {
 
 class GridMolecule {
 public:
     GridMolecule() = default;
-    GridMolecule(Molecule const &in_mol) :
+    GridMolecule(Molecule const &in_mol, float const resolution) :
         _idx_x(sort_indices(in_mol._x)), _idx_y(sort_indices(in_mol._y)),
         _idx_z(sort_indices(in_mol._z)), _natoms(in_mol._natoms) {
 
@@ -25,9 +24,12 @@ public:
         _radii.reserve(_natoms);
 
         for (int i = 0; i < _natoms; ++i) {
-            auto const x = cont_to_grid(in_mol._x[i] - _orig_vtor[0]);
-            auto const y = cont_to_grid(in_mol._y[i] - _orig_vtor[1]);
-            auto const z = cont_to_grid(in_mol._z[i] - _orig_vtor[2]);
+            auto const x =
+                cont_to_grid(in_mol._x[i] - _orig_vtor[0], resolution);
+            auto const y =
+                cont_to_grid(in_mol._y[i] - _orig_vtor[1], resolution);
+            auto const z =
+                cont_to_grid(in_mol._z[i] - _orig_vtor[2], resolution);
 
             if (x < _x_min)
                 _x_min = x;
@@ -49,7 +51,7 @@ public:
         }
     }
 
-    void draw(std::string const &ou_fil);
+    void draw(std::string const &ou_fil, float const resolution);
 
     // Indices that sort the atoms along the 3 axes.
     std::vector<int> const _idx_x, _idx_y, _idx_z;
@@ -79,7 +81,8 @@ public:
     GridBool(ConvexHull const &CH);
 };
 
-void fill_grid_tetrahedron(GridMolecule const &in_mol);
+auto fill_grid_tetrahedron(GridMolecule const &in_mol, float const resolution)
+    -> std::vector<std::vector<std::vector<grid_t>>>;
 
 } // namespace GrANA
 

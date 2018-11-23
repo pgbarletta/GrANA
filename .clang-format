@@ -21,4 +21,5 @@ AlwaysBreakTemplateDeclarations: true
 BreakConstructorInitializers: AfterColon
 Cpp11BracedListStyle: true
 SpaceBeforeCpp11BracedList: false
+BreakBeforeBinaryOperators: None
 ...

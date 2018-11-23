@@ -9,8 +9,6 @@
 #include <tuple>
 #include <vector>
 
-extern float resolution;
-
 namespace GrANA {
 
 // Read input.

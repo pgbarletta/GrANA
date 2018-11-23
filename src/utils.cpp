@@ -11,7 +11,7 @@ auto get_input(int argc, char **argv)
             throw std::invalid_argument(
                 "Usage: GrANA resolution in_pdb out_pdb\n");
         }
-        resolution = std::stof(argv[1]);
+        r = std::stof(argv[1]);
     } catch (...) {
         std::terminate();
     }

@@ -1,13 +1,13 @@
 #include "GrANA/grid.hpp"
 namespace GrANA {
 
-void GridMolecule::draw(std::string const &ou_fil) {
+void GridMolecule::draw(std::string const &ou_fil, float const resolution) {
 
     FILE *file = std::fopen(ou_fil.c_str(), "w");
     if (file) {
         for (int i = 0; i <= _natoms - 1; ++i) {
             GridPoint const atm(_x[i], _y[i], _z[i]);
-            atm.draw(file, i + 1, i + 1, _orig_vtor);
+            atm.draw(file, i + 1, i + 1, _orig_vtor, resolution);
         }
     } else {
         std::cerr << "Could not open " << ou_fil << ". " << '\n';
@@ -16,25 +16,44 @@ void GridMolecule::draw(std::string const &ou_fil) {
     return;
 }
 
-void fill_grid_tetrahedron(GridMolecule const &in_mol) {
+auto fill_grid_tetrahedron(GridMolecule const &in_mol, float const resolution)
+    -> std::vector<std::vector<std::vector<grid_t>>> {
     // Inverse square root
-    float constexpr isr = 0.7071f;
-    grid_t const sz_x = in_mol._x_max - in_mol._x_min + 1;
-    grid_t const sz_y = in_mol._y_max - in_mol._y_min + 1;
-    grid_t const sz_z = in_mol._z_max - in_mol._z_min + 1;
-    std::vector<std::vector<std::vector<grid_t>>> mtx(sz_z,
-        std::vector<std::vector<grid_t>>(sz_y, std::vector<grid_t>(sz_x)));
+    float constexpr isqrt = 0.7071f;
+    std::vector<std::vector<std::vector<grid_t>>> mtx(in_mol._z_max,
+        std::vector<std::vector<grid_t>>(
+            in_mol._y_max, std::vector<grid_t>(in_mol._x_max)));
 
-    for (auto k = 0; k < in_mol._natoms; ++k) {
-        x = in_mol._x[k];
-        y = in_mol._y[k];
-        z = in_mol._z[k];
-        mtx[x][y][z] = 1;
-        grid_t const grid_rad = static_cast<grid_t>(in_mol._radii / resolution);
-        // Inner square dimension in grid units.
-        grid_t const is = static_cast<grid_t>(grid_rad * isr);
+    for (auto ii = 0; ii < in_mol._natoms; ++ii) {
+        grid_t const x = in_mol._x[ii];
+        grid_t const y = in_mol._y[ii];
+        grid_t const z = in_mol._z[ii];
+
+        // Atom VdW radius, inner square dimension and their difference.
+        grid_t const radius =
+            static_cast<grid_t>(in_mol._radii[ii] / resolution);
+        grid_t const is = static_cast<grid_t>(radius * isqrt);
+        [[maybe_unused]] grid_t const leftover = radius - is;
+
+        for (grid_t k = -is; k <= is; ++k) {
+            grid_t const iz = z - k;
+            for (grid_t j = -is; j <= is; ++j) {
+                grid_t const iy = y - j;
+                for (grid_t i = -is; i <= is; ++i) {
+                    grid_t const ix = x - i;
+                    if (ix >= 0 and iy >= 0 and iz >= 0 and
+                        ix < in_mol._x_max and iy < in_mol._y_max and
+                        iz < in_mol._z_max) {
+                        mtx[iz][iy][ix] = 1;
+
+                        // printf("ix: %i iy: %i iz: %i \n", ix, iy, iz);
+                    }
+                }
+            }
+        }
     }
 
+    return mtx;
     // for (auto i = 0; i < in_mol._natoms - 3; ++i) {
     //     grid_t const x0 = in_mol._x[in_mol._idx_x[i]];
     //     grid_t const y0 = in_mol._y[in_mol._idx_x[i]];
@@ -86,7 +105,6 @@ void fill_grid_tetrahedron(GridMolecule const &in_mol) {
     //         printf("%i+%i+%i+%i\n", in_mol._idx_x[i], in_mol._idx_x[i + 1],
     //             in_mol._idx_x[i + 2], in_mol._idx_x[i + 3]);
     // }
-    return;
 }
 
 }

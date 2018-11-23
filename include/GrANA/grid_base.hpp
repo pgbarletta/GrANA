@@ -5,7 +5,9 @@
 
 namespace GrANA {
 
-float saa();
+void draw(std::string const &out_fil,
+    std::vector<std::vector<std::vector<grid_t>>> const &mtx,
+    Vector const &orig_vtor, float resolution);
 
 } // namespace GrANA
 
