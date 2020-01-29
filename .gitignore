@@ -52,7 +52,7 @@ Thumbs.db
 *.exe
 *.out
 CMakeFiles/
-build/grana
+build/
 CMakeCache.txt
 *ninja*
 as
