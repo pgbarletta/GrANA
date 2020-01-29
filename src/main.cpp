@@ -10,7 +10,7 @@
 
 int main(int argc, char **argv) {
 
-    auto [in_pdb, out_pdb, resolution] = GrANA::get_input(argc, argv);
+    auto[in_pdb, out_pdb, resolution] = GrANA::get_input(argc, argv);
 
     std::vector<int> indices = {
         300, 600, 900, 1200, 1500, 1800, 1240, 400, 500, 700, 800, 1000, 1100};
