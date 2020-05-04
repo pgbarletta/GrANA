@@ -3,7 +3,8 @@ namespace GrANA {
 
 GridMolecule::GridMolecule(Molecule const &in_mol, float const resolution) :
     _idx_x(sort_indices(in_mol._x)), _idx_y(sort_indices(in_mol._y)),
-    _idx_z(sort_indices(in_mol._z)), _natoms(in_mol._natoms) {
+    _idx_z(sort_indices(in_mol._z)), _natoms(in_mol._natoms),
+    _resolution(resolution) {
 
     _orig_vtor = Vector(std::floor(in_mol._x[_idx_x[0]]),
         std::floor(in_mol._y[_idx_y[0]]), std::floor(in_mol._z[_idx_z[0]]));
@@ -14,22 +15,25 @@ GridMolecule::GridMolecule(Molecule const &in_mol, float const resolution) :
     _radii.reserve(_natoms);
 
     for (int i = 0; i < _natoms; ++i) {
-        grid_t const x = cont_to_grid(in_mol._x[i] - _orig_vtor[0], resolution);
-        grid_t const y = cont_to_grid(in_mol._y[i] - _orig_vtor[1], resolution);
-        grid_t const z = cont_to_grid(in_mol._z[i] - _orig_vtor[2], resolution);
+        grid_t const x =
+            cont_to_grid(in_mol._x[i] - _orig_vtor[0], _resolution);
+        grid_t const y =
+            cont_to_grid(in_mol._y[i] - _orig_vtor[1], _resolution);
+        grid_t const z =
+            cont_to_grid(in_mol._z[i] - _orig_vtor[2], _resolution);
 
-        if (x < _x_min)
-            _x_min = x;
-        if (y < _y_min)
-            _y_min = y;
-        if (z < _z_min)
-            _z_min = z;
-        if (x > _x_max)
-            _x_max = x;
-        if (y > _y_max)
-            _y_max = y;
-        if (z > _z_max)
-            _z_max = z;
+        if (x < _start[0])
+            _start[0] = x;
+        if (y < _start[1])
+            _start[1] = y;
+        if (z < _start[2])
+            _start[2] = z;
+        if (x > _end[0])
+            _end[0] = x;
+        if (y > _end[1])
+            _end[1] = y;
+        if (z > _end[2])
+            _end[2] = z;
 
         _x.push_back(x);
         _y.push_back(y);
@@ -37,21 +41,19 @@ GridMolecule::GridMolecule(Molecule const &in_mol, float const resolution) :
         _radii.push_back(in_mol._radii[i]);
     }
 
-    _size_x = _x_max - _x_min;
-    _size_y = _y_max - _y_min;
-    _size_z = _z_max - _z_min;
-    _size = std::max({_size_x, _size_y, _size_z});
+    _sizes = {_end[0] - _start[0], _end[1] - _start[1], _end[2] - _start[2]};
+    _size = std::max({_sizes[0], _sizes[1], _sizes[2]});
     // don't mind the rounding.
-    _center = {(_size_x) / 2, (_size_y) / 2, (_size_z) / 2};
+    _center = {(_sizes[0]) / 2, (_sizes[1]) / 2, (_sizes[2]) / 2};
 }
 
-void GridMolecule::draw(std::string const &ou_fil, float const resolution) {
+void GridMolecule::draw(std::string const &ou_fil) {
 
     FILE *file = std::fopen(ou_fil.c_str(), "w");
     if (file) {
         for (int i = 0; i <= _natoms - 1; ++i) {
             GridPoint const atm(_x[i], _y[i], _z[i]);
-            atm.draw(file, i + 1, i + 1, _orig_vtor, resolution);
+            atm.draw(file, i + 1, i + 1, _orig_vtor, _resolution);
         }
     } else {
         std::cerr << "Could not open " << ou_fil << ". " << '\n';
@@ -60,13 +62,13 @@ void GridMolecule::draw(std::string const &ou_fil, float const resolution) {
     return;
 }
 
-auto fill_grid_tetrahedron(GridMolecule const &in_mol, float const resolution)
+auto fill_grid_tetrahedron(GridMolecule const &in_mol)
     -> std::vector<std::vector<std::vector<grid_t>>> {
     // Inverse square root
     float constexpr isqrt = 0.7071f;
-    std::vector<std::vector<std::vector<grid_t>>> mtx(in_mol._z_max,
+    std::vector<std::vector<std::vector<grid_t>>> mtx(in_mol._end[2],
         std::vector<std::vector<grid_t>>(
-            in_mol._y_max, std::vector<grid_t>(in_mol._x_max)));
+            in_mol._end[1], std::vector<grid_t>(in_mol._end[0])));
 
     for (auto ii = 0; ii < in_mol._natoms; ++ii) {
         grid_t const x = in_mol._x[ii];
@@ -74,8 +76,8 @@ auto fill_grid_tetrahedron(GridMolecule const &in_mol, float const resolution)
         grid_t const z = in_mol._z[ii];
 
         // Atom VdW radius, inner square dimension and their difference.
-        grid_t const radius =
-            static_cast<grid_t>(std::floor(in_mol._radii[ii] / resolution));
+        grid_t const radius = static_cast<grid_t>(
+            std::floor(in_mol._radii[ii] / in_mol._resolution));
         grid_t const is = static_cast<grid_t>(std::floor(radius * isqrt));
         [[maybe_unused]] grid_t const leftover = radius - is;
 
@@ -86,8 +88,8 @@ auto fill_grid_tetrahedron(GridMolecule const &in_mol, float const resolution)
                 for (grid_t i = -is; i <= is; ++i) {
                     grid_t const ix = x - i;
                     if (ix >= 0 and iy >= 0 and iz >= 0 and
-                        ix < in_mol._x_max and iy < in_mol._y_max and
-                        iz < in_mol._z_max) {
+                        ix < in_mol._end[0] and iy < in_mol._end[1] and
+                        iz < in_mol._end[2]) {
                         mtx[iz][iy][ix] = 1;
                     }
                 }

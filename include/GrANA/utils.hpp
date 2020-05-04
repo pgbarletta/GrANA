@@ -34,6 +34,25 @@ auto sort_indices(std::vector<T> const &v) -> std::vector<int> {
 void get_indices_from_sparse_bool_array(
     bool *in_array, const int n_in, std::vector<int> &indices);
 
+//
+template <typename Container_u, typename T_u = typename Container_u::value_type,
+    typename Container_v, typename T_v = typename Container_v::value_type>
+auto reorder(Container_u const &u, Container_v const &v) -> Container_u {
+
+    auto const sz = u.size();
+    if (sz != v.size()) {
+        throw std::runtime_error(
+            "reorder() fail. u and v don't have same length.\n");
+    }
+    Container_u w;
+    w.reserve(sz);
+    for (size_t i = 0; i != sz; ++i) {
+        w.push_back(u[v[i]]);
+    }
+
+    return w;
+}
+
 } // namespace GrANA
 
 #endif // GrANA_UTILS

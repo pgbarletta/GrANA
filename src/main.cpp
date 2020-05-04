@@ -7,6 +7,7 @@
 #include "GrANA/continuous.hpp"
 #include "GrANA/grid.hpp"
 #include "GrANA/utils.hpp"
+#include <GrANA/octree.hpp>
 
 int main(int argc, char **argv) {
 
@@ -21,7 +22,7 @@ int main(int argc, char **argv) {
     incl_area.draw(out_pdb);
 
     GrANA::GridMolecule Gprote(prote, resolution);
-    Gprote.draw("aux/g1mtn.pdb", resolution);
+    Gprote.draw("-g1mtn.pdb");
 
     // printf("_x_min: %i\n", Gprote._x_min);
     // printf("_y_min: %i\n", Gprote._y_min);
@@ -31,8 +32,8 @@ int main(int argc, char **argv) {
     // printf("_y_max: %i\n", Gprote._y_max);
     // printf("_z_max: %i\n", Gprote._z_max);
 
-    auto mtx = GrANA::fill_grid_tetrahedron(Gprote, resolution);
-    draw(out_pdb, mtx, Gprote._orig_vtor, resolution);
+    // auto mtx = GrANA::fill_grid_tetrahedron(Gprote, resolution);
+    // draw(out_pdb, mtx, Gprote._orig_vtor, resolution);
 
     return 0;
 }
