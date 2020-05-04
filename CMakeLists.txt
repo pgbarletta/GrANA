@@ -25,6 +25,7 @@ target_sources(grana
         src/continuous.cpp
         src/grid.cpp
         src/grid_base.cpp
+        src/octree.cpp
         include/GrANA/utils.hpp
         include/GrANA/continuous_primitives.hpp
         include/GrANA/continuous_base.hpp
@@ -32,6 +33,7 @@ target_sources(grana
         include/GrANA/grid_primitives.hpp
         include/GrANA/grid_base.hpp
         include/GrANA/grid.hpp
+        include/GrANA/octree.hpp
 )
 
 message("${Magenta}Trying to automatically locate CGAL, gmp and mpfr libraries.${ColourReset}")
@@ -53,5 +55,5 @@ target_include_directories(grana
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
 
-target_compile_options(grana PRIVATE -Wall)
+target_compile_options(grana PRIVATE -Wall -Wextra)
 target_compile_features(grana PRIVATE cxx_std_17)
