@@ -10,7 +10,8 @@ namespace GrANA {
 
 class Octree {
 public:
-    Octree(GridMolecule const &molecula, grid_t const bucket_size);
+    Octree(Molecule const &in_mol, float const resolution,
+        grid_t const bucket_size);
 
     class Octant {
     public:
@@ -44,14 +45,45 @@ public:
         return octant;
     }
 
-    // Main octant
-    Octant *_root;
+    // Indices that sort the atoms along the 3 axes.
+    std::vector<int> const _idx_x, _idx_y, _idx_z;
+
+    // number of atoms.
+    int const _natoms;
+
+    // Origin coordinates.
+    Vector _orig_vtor{0.0f, 0.0f, 0.0f};
 
     // Atoms coordinates. Using SoA.
-    std::vector<grid_t> _x_sorted, _y_sorted, _z_sorted;
+    std::vector<grid_t> _x, _y, _z;
+
+    // Atoms VdW radii
+    std::vector<float> _radii;
+
+    // Min and max coordinates for each axis. Can be used to get main cube's
+    // vertices coordinates.
+    std::array<grid_t, 3> _start{std::numeric_limits<grid_t>::max(),
+        std::numeric_limits<grid_t>::max(), std::numeric_limits<grid_t>::max()},
+        _end{std::numeric_limits<grid_t>::min(),
+            std::numeric_limits<grid_t>::min(),
+            std::numeric_limits<grid_t>::min()};
+
+    // Cube's center coordinates.
+    std::array<grid_t, 3> _center;
+
+    // _size holds the cube's size and is equal to the max element of _sizes,
+    // which holds the sizes in xyz coordinates.
+    grid_t _size;
+    std::array<grid_t, 3> _sizes;
+
+    // Resolution used to build the GridMolecule.
+    float const _resolution = 1.0;
 
     // Minimum octant size.
     int const _bucket_size = 5;
+
+    // Main octant
+    Octant *_root;
 };
 }
 

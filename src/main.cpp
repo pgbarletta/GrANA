@@ -21,8 +21,8 @@ int main(int argc, char **argv) {
     GrANA::Triangulation incl_area(prote, indices);
     incl_area.draw(out_pdb);
 
-    GrANA::GridMolecule Gprote(prote, resolution);
-    Gprote.draw("-g1mtn.pdb");
+    // GrANA::GridMolecule Gprote(prote, resolution);
+    // Gprote.draw("-g1mtn.pdb");
 
     // printf("_x_min: %i\n", Gprote._x_min);
     // printf("_y_min: %i\n", Gprote._y_min);
