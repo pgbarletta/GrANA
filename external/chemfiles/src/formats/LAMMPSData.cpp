@@ -1,275 +1,232 @@
 // Chemfiles, a modern library for chemistry file reading and writing
 // Copyright (C) Guillaume Fraux and contributors -- BSD license
 
+#include <cstdint>
 #include <cassert>
+#include <cmath>
+
+#include <tuple>
+#include <array>
+#include <string>
+#include <vector>
+#include <algorithm>
+#include <unordered_map>
 #include <unordered_set>
 
-#include <fmt/format.h>
-#include <fmt/ostream.h>
+#include "chemfiles/types.hpp"
+#include "chemfiles/utils.hpp"
+#include "chemfiles/parse.hpp"
+#include "chemfiles/warnings.hpp"
+#include "chemfiles/error_fmt.hpp"
+#include "chemfiles/sorted_set.hpp"
+#include "chemfiles/unreachable.hpp"
+#include "chemfiles/string_view.hpp"
+#include "chemfiles/external/span.hpp"
+#include "chemfiles/external/optional.hpp"
+
+#include "chemfiles/Atom.hpp"
+#include "chemfiles/File.hpp"
+#include "chemfiles/Frame.hpp"
+#include "chemfiles/Residue.hpp"
+#include "chemfiles/Topology.hpp"
+#include "chemfiles/UnitCell.hpp"
+#include "chemfiles/Connectivity.hpp"
+#include "chemfiles/FormatMetadata.hpp"
 
 #include "chemfiles/formats/LAMMPSData.hpp"
 
-#include "chemfiles/ErrorFmt.hpp"
-#include "chemfiles/File.hpp"
-#include "chemfiles/Frame.hpp"
-#include "chemfiles/utils.hpp"
-#include "chemfiles/warnings.hpp"
 
 using namespace chemfiles;
 
-template<> FormatInfo chemfiles::format_information<LAMMPSDataFormat>() {
-    return FormatInfo("LAMMPS Data").description(
-        "LAMMPS text input data file"
-    );
+/// Guess molecules id from the bonds. This function return a vector containing
+/// the molecule id for each atom in the frame
+static std::vector<size_t> guess_molecules(const Frame& frame);
+
+/// Make sure the tilt factor matrix[i][j] is contained between -matrix[i][i] / 2
+/// and matrix[i][i] / 2.
+static double tilt_factor(const Matrix3D& matrix, size_t i, size_t j);
+
+template<> const FormatMetadata& chemfiles::format_metadata<LAMMPSDataFormat>() {
+    static FormatMetadata metadata;
+    metadata.name = "LAMMPS Data";
+    metadata.extension = nullopt;
+    metadata.description = "LAMMPS input data file";
+    metadata.reference = "https://lammps.sandia.gov/doc/read_data.html";
+
+    metadata.read = true;
+    metadata.write = true;
+    metadata.memory = true;
+
+    metadata.positions = true;
+    metadata.velocities = true;
+    metadata.unit_cell = true;
+    metadata.atoms = true;
+    metadata.bonds = true;
+    metadata.residues = true;
+    return metadata;
 }
 
-atom_style::atom_style(const std::string& name): name_(name) {
-    if (name == "angle") {
+atom_style::atom_style(std::string name): name_(std::move(name)) {
+    if (name_ == "angle") {
         style_ = ANGLE;
-        expected_ = 6;
-    } else if (name == "atomic") {
+    } else if (name_ == "atomic") {
         style_ = ATOMIC;
-        expected_ = 5;
-    } else if (name == "body") {
+    } else if (name_ == "body") {
         style_ = BODY;
-        expected_ = 6;
-    } else if (name == "bond") {
+    } else if (name_ == "bond") {
         style_ = BOND;
-        expected_ = 6;
-    } else if (name == "charge") {
+    } else if (name_ == "charge") {
         style_ = CHARGE;
-        expected_ = 6;
-    } else if (name == "dipole") {
+    } else if (name_ == "dipole") {
         style_ = DIPOLE;
-        expected_ = 6;
-    } else if (name == "dpd") {
+    } else if (name_ == "dpd") {
         style_ = DPD;
-        expected_ = 5;
-    } else if (name == "electron") {
+    } else if (name_ == "electron") {
         style_ = ELECTRON;
-        expected_ = 5;
-    } else if (name == "ellipsoid") {
+    } else if (name_ == "ellipsoid") {
         style_ = ELLIPSOID;
-        expected_ = 5;
-    } else if (name == "full") {
+    } else if (name_ == "full") {
         style_ = FULL;
-        expected_ = 7;
-    } else if (name == "line") {
+    } else if (name_ == "line") {
         style_ = LINE;
-        expected_ = 6;
-    } else if (name == "meso") {
+    } else if (name_ == "meso") {
         style_ = MESO;
-        expected_ = 5;
-    } else if (name == "molecular") {
+    } else if (name_ == "molecular") {
         style_ = MOLECULAR;
-        expected_ = 6;
-    } else if (name == "peri") {
+    } else if (name_ == "peri") {
         style_ = PERI;
-        expected_ = 5;
-    } else if (name == "smd") {
+    } else if (name_ == "smd") {
         style_ = SMD;
-        expected_ = 7;
-    } else if (name == "sphere") {
+    } else if (name_ == "sphere") {
         style_ = SPHERE;
-        expected_ = 5;
-    } else if (name == "template") {
+    } else if (name_ == "template") {
         style_ = TEMPLATE;
-        expected_ = 6;
-    } else if (name == "tri") {
+    } else if (name_ == "tri") {
         style_ = TRI;
-        expected_ = 6;
-    } else if (name == "wavepacket") {
+    } else if (name_ == "wavepacket") {
         style_ = WAVEPACKET;
-        expected_ = 6;
-    } else if (name == "hybrid") {
+    } else if (name_ == "hybrid") {
         style_ = HYBRID;
-        expected_ = 5;
     } else {
-        throw format_error("unknown atom style '{}'", name);
+        throw format_error("LAMMPS Data: unknown atom style '{}'", name_);
     }
-    assert(expected_ != 0);
 }
 
-atom_data atom_style::read_line(const std::string& line) const {
-    atom_data data;
-    int assigned = 0;
+atom_data atom_style::read_line(string_view line, size_t index) const {
+    atom_data d;
+
+    // dummy variable to ignore a value
+    double SKIP;
     switch (style_) {
     case ANGLE:
     case BOND:
     case MOLECULAR:
         // atom-ID molecule-ID atom-type x y z
-        assigned = sscanf(
-            line.c_str(), "%zu %zu %zu %lf %lf %lf",
-            &data.index, &data.molid, &data.type, &data.x, &data.y, &data.z
-        );
+        scan(line, d.index, d.molid, d.type, d.x, d.y, d.z);
         break;
     case ATOMIC:
         // atom-ID atom-type x y z
-        assigned = sscanf(
-            line.c_str(), "%zu %zu %lf %lf %lf",
-            &data.index, &data.type, &data.x, &data.y, &data.z
-        );
+        scan(line, d.index, d.type, d.x, d.y, d.z);
         break;
     case BODY:
         // atom-ID atom-type bodyflag mass x y z
-        assigned = sscanf(
-            line.c_str(), "%zu %zu %*d %lf %lf %lf %lf",
-            &data.index, &data.type, &data.mass, &data.x, &data.y, &data.z
-        );
+        scan(line, d.index, d.type, SKIP, d.mass, d.x, d.y, d.z);
         break;
     case CHARGE:
     case DIPOLE:
         // atom-ID atom-type q x y z
         // atom-ID atom-type q x y z mux muy muz
-        assigned = sscanf(
-            line.c_str(), "%zu %zu %lf %lf %lf %lf",
-            &data.index, &data.type, &data.charge, &data.x, &data.y, &data.z
-        );
+        scan(line, d.index, d.type, d.charge, d.x, d.y, d.z);
         break;
     case DPD:
         // atom-ID atom-type theta x y z
-        assigned = sscanf(
-            line.c_str(), "%zu %zu %*f %lf %lf %lf",
-            &data.index, &data.type, &data.x, &data.y, &data.z
-        );
+        scan(line, d.index, d.type, SKIP, d.x, d.y, d.z);
         break;
     case ELECTRON:
         // atom-ID atom-type q spin eradius x y z
-        assigned = sscanf(
-            line.c_str(), "%zu %zu %*f %*f %lf %lf %lf",
-            &data.index, &data.type, &data.x, &data.y, &data.z
-        );
+        scan(line, d.index, d.type, SKIP, SKIP, d.x, d.y, d.z);
         break;
     case ELLIPSOID:
         // atom-ID atom-type ellipsoidflag density x y z
-        assigned = sscanf(
-            line.c_str(), "%zu %zu %*d %*f %lf %lf %lf",
-            &data.index, &data.type, &data.x, &data.y, &data.z
-        );
+        scan(line, d.index, d.type, SKIP, SKIP, d.x, d.y, d.z);
         break;
     case FULL:
         // atom-ID molecule-ID atom-type q x y z
-        assigned = sscanf(
-            line.c_str(), "%zu %zu %zu %lf %lf %lf %lf",
-            &data.index, &data.molid, &data.type, &data.charge, &data.x, &data.y, &data.z
-        );
+        scan(line, d.index, d.molid, d.type, d.charge, d.x, d.y, d.z);
         break;
     case LINE:
         // atom-ID molecule-ID atom-type lineflag density x y z
-        assigned = sscanf(
-            line.c_str(), "%zu %zu %zu %*d %*f %lf %lf %lf",
-            &data.index, &data.molid, &data.type, &data.x, &data.y, &data.z
-        );
+        scan(line, d.index, d.molid, d.type, SKIP, SKIP, d.x, d.y, d.z);
         break;
     case MESO:
         // atom-ID atom-type rho e cv x y z
-        assigned = sscanf(
-            line.c_str(), "%zu %zu %*f %*f %*f %lf %lf %lf",
-            &data.index, &data.type, &data.x, &data.y, &data.z
-        );
+        scan(line, d.index, d.type, SKIP, SKIP, SKIP, d.x, d.y, d.z);
         break;
     case PERI:
         // atom-ID atom-type volume density x y z
-        assigned = sscanf(
-            line.c_str(), "%zu %zu %*f %*f %lf %lf %lf",
-            &data.index, &data.type, &data.x, &data.y, &data.z
-        );
+        scan(line, d.index, d.type, SKIP, SKIP, d.x, d.y, d.z);
         break;
     case SMD:
         // atom-ID atom-type molecule volume mass kernel-radius contact-radius x y z
-        assigned = sscanf(
-            line.c_str(), "%zu %zu %zu %*f %lf %*f %*f %lf %lf %lf",
-            &data.index, &data.type, &data.molid, &data.mass, &data.x, &data.y, &data.z
-        );
+        scan(line, d.index, d.type, d.molid, SKIP, d.mass, SKIP, SKIP, d.x, d.y, d.z);
         break;
     case SPHERE:
         // atom-ID atom-type diameter density x y z
-        assigned = sscanf(
-            line.c_str(), "%zu %zu %*f %*f %lf %lf %lf",
-            &data.index, &data.type, &data.x, &data.y, &data.z
-        );
+        scan(line, d.index, d.type, SKIP, SKIP, d.x, d.y, d.z);
         break;
     case TEMPLATE:
         // atom-ID molecule-ID template-index template-atom atom-type x y z
-        assigned = sscanf(
-            line.c_str(), "%zu %zu %*d %*d %zu %lf %lf %lf",
-            &data.index, &data.molid, &data.type, &data.x, &data.y, &data.z
-        );
+        scan(line, d.index, d.molid, SKIP, SKIP, d.type, d.x, d.y, d.z);
         break;
     case TRI:
         // atom-ID molecule-ID atom-type triangleflag density x y z
-        assigned = sscanf(
-            line.c_str(), "%zu %zu %zu %*d %*f %lf %lf %lf",
-            &data.index, &data.molid, &data.type, &data.x, &data.y, &data.z
-        );
+        scan(line, d.index, d.molid, d.type, SKIP, SKIP, d.x, d.y, d.z);
         break;
     case WAVEPACKET:
         // atom-ID atom-type charge spin eradius etag cs_re cs_im x y z
-        assigned = sscanf(
-            line.c_str(), "%zu %zu %lf %*f %*f %*d %*f %*f %lf %lf %lf",
-            &data.index, &data.type, &data.charge, &data.x, &data.y, &data.z
-        );
+        scan(line, d.index, d.type, d.charge, SKIP, SKIP, SKIP, SKIP, SKIP, d.x, d.y, d.z);
         break;
     case HYBRID:
         if (!warned_) {
-            warning("Only reading the first style for atom_style hybrid");
+            warning("LAMMPS Data reader", "only reading the first style for atom_style hybrid");
             warned_ = true;
         }
         // atom-ID atom-type x y z sub-style1 sub-style2 ...
-        assigned = sscanf(
-            line.c_str(), "%zu %zu %lf %lf %lf",
-            &data.index, &data.type, &data.x, &data.y, &data.z
-        );
+        scan(line, d.index, d.type, d.x, d.y, d.z);
         break;
     }
 
-    if (assigned != expected_) {
-        throw format_error("invalid line for atom style {}: {}", name_, line);
+    if (d.index == 0) {
+        // 0 means the user do not care about indexes, but we still need one.
+        // So we use the index provided by the caller of this function
+        d.index = index;
+    } else {
+        // LAMMPS uses 1 based indexes, convert it to 0-based
+        d.index -= 1;
     }
 
-    // LAMMPS uses 1-based indexing
-    data.index -= 1;
-    if (data.molid != static_cast<size_t>(-1)) {
-        data.molid -= 1;
-    }
-
-    return data;
+    return d;
 }
 
-/// Split a string in data (stays in the `line` parameter) and comment
-/// (in the return value).
-static std::string split_comment(std::string& line);
+/// Remove the comment from `line` and return it.
+static string_view split_comment(string_view& line);
 /// Check if the line is an unused header value
-static bool is_unused_header(const std::string& line);
-/// Cast a long long value to a size_t, while checking that the value does fit
-/// in a size_t
-static size_t checked_cast(long long int value);
+static bool is_unused_header(string_view line);
 
-LAMMPSDataFormat::LAMMPSDataFormat(const std::string& path, File::Mode mode):
-    current_section_(HEADER), file_(TextFile::create(path, mode)), style_("full") {}
+void LAMMPSDataFormat::read_next(Frame& frame) {
+    if (file_.tellpos() != 0) {
+        throw format_error("LAMMPS Data format only supports reading one frame");
+    }
 
-size_t LAMMPSDataFormat::nsteps() {
-    return 1;
-}
-
-void LAMMPSDataFormat::read_step(const size_t step, Frame& frame) {
-    assert(step == 0);
-    file_->rewind();
-    current_section_ = HEADER;
-    read(frame);
-}
-
-void LAMMPSDataFormat::read(Frame& frame) {
-    auto comment = file_->readline();
-
+    auto comment = file_.readline();
     // VMD topotools writes the atom style in the comment header
     auto it = comment.find("atom_style");
     if (it != std::string::npos) {
-        auto end = trim(comment.substr(it + 10));
-        atom_style_name_ = trim(split(end, ' ')[0]);
+        auto style = comment.substr(it + 10);
+        atom_style_name_ = trim(split(style, ' ')[0]).to_string();
     }
 
-    while(!file_->eof()) {
+    while(!file_.eof()) {
         switch (current_section_) {
         case HEADER:
             read_header(frame);
@@ -300,11 +257,11 @@ void LAMMPSDataFormat::read(Frame& frame) {
 
 void LAMMPSDataFormat::read_header(Frame& frame) {
     assert(current_section_ == HEADER);
-    double a = 1.0;
-    double b = 1.0;
-    double c = 1.0;
-    while (!file_->eof()) {
-        auto line = file_->readline();
+    auto matrix = Matrix3D::unit();
+    auto shape = UnitCell::ORTHORHOMBIC;
+
+    while (!file_.eof()) {
+        auto line = file_.readline();
         auto content = line;
         split_comment(content);
         if (content.empty() || is_unused_header(content)) {
@@ -316,49 +273,60 @@ void LAMMPSDataFormat::read_header(Frame& frame) {
         } else if (content.find("atom types") != std::string::npos) {
             natom_types_ = read_header_integer(content, "atom types");
         } else if (content.find("xlo xhi") != std::string::npos) {
-            a = read_header_box_bounds(content, "xlo xhi");
+            matrix[0][0] = read_header_box_bounds(content, "xlo xhi");
         } else if (content.find("ylo yhi") != std::string::npos) {
-            b = read_header_box_bounds(content, "ylo yhi");
+            matrix[1][1] = read_header_box_bounds(content, "ylo yhi");
         } else if (content.find("zlo zhi") != std::string::npos) {
-            c = read_header_box_bounds(content, "zlo zhi");
+            matrix[2][2] = read_header_box_bounds(content, "zlo zhi");
         } else if (content.find("xy xz yz") != std::string::npos) {
-            throw format_error(
-                "triclinic cells are not yet implemented with LAMMPS data format"
-            );
+            auto splitted = split(content, ' ');
+            if (splitted.size() != 6) {
+                throw format_error(
+                    "invalid header value: expected '<xy> <xz> <yz> xy xz yz', got '{}'", content
+                );
+            }
+            matrix[0][1] = parse<double>(splitted[0]);
+            matrix[0][2] = parse<double>(splitted[1]);
+            matrix[1][2] = parse<double>(splitted[2]);
+            // Even if all parameters are 0, set shape to TRICLINIC
+            shape = UnitCell::TRICLINIC;
         } else {
             // End of the header, get the section and break
             current_section_ = get_section(line);
+            assert(current_section_ != NOT_A_SECTION);
             break;
         }
     }
-    frame.set_cell(UnitCell(a, b, c));
+    auto cell = UnitCell(matrix);
+    cell.set_shape(shape);
+    frame.set_cell(cell);
 }
 
-size_t LAMMPSDataFormat::read_header_integer(const std::string& line, const std::string& context) {
-    auto splitted = split(trim(line), ' ');
+size_t LAMMPSDataFormat::read_header_integer(string_view line, const std::string& context) {
+    auto splitted = split(line, ' ');
     if (splitted.size() < 2) {
         throw format_error(
             "invalid header value: expected '<n> {}', got '{}'", context, line
         );
     }
-    return checked_cast(string2longlong(splitted[0]));
+    return parse<size_t>(splitted[0]);
 }
 
-double LAMMPSDataFormat::read_header_box_bounds(const std::string& line, const std::string& context) {
-    auto splitted = split(trim(line), ' ');
+double LAMMPSDataFormat::read_header_box_bounds(string_view line, const std::string& context) {
+    auto splitted = split(line, ' ');
     if (splitted.size() < 4) {
         throw format_error(
             "invalid header value: expected '<lo> <hi> {}', got '{}'", context, line
         );
     }
-    auto low = string2double(splitted[0]);
-    auto high = string2double(splitted[1]);
+    auto low = parse<double>(splitted[0]);
+    auto high = parse<double>(splitted[1]);
     return high - low;
 }
 
 void LAMMPSDataFormat::get_next_section() {
-    while (!file_->eof()) {
-        auto line = file_->readline();
+    while (!file_.eof()) {
+        auto line = file_.readline();
         if (!line.empty()) {
             auto section = get_section(line);
             if (section == NOT_A_SECTION) {
@@ -372,8 +340,8 @@ void LAMMPSDataFormat::get_next_section() {
 }
 
 void LAMMPSDataFormat::skip_to_next_section() {
-    while (!file_->eof()) {
-        auto line = file_->readline();
+    while (!file_.eof()) {
+        auto line = file_.readline();
         if (!line.empty()) {
             auto section = get_section(line);
             if (section == NOT_A_SECTION) {
@@ -392,25 +360,24 @@ void LAMMPSDataFormat::read_atoms(Frame& frame) {
         throw format_error("missing atoms count in header");
     }
 
-    if (atom_style_name_ == "") {
-        warning("Unknown LAMMPS atom style, defaulting to full.");
-        warning("You can give the atom style like this: Atoms  # <style>");
+    if (atom_style_name_.empty()) {
+        warning("LAMMPS Data reader", "unknown atom style, defaulting to 'full'");
         atom_style_name_ = "full";
     }
     style_ = atom_style(atom_style_name_);
 
     frame.resize(natoms_);
     auto positions = frame.positions();
-    auto residues = std::vector<Residue>();
+    auto residues = std::unordered_map<size_t, Residue>();
 
     size_t n = 0;
-    while (n < natoms_ && !file_->eof()) {
-        auto line = file_->readline();
+    while (n < natoms_ && !file_.eof()) {
+        auto line = file_.readline();
         auto comment = split_comment(line);
         if (line.empty()) {continue;}
 
-        auto data = style_.read_line(line);
-        if (data.index > natoms_) {
+        auto data = style_.read_line(line, n);
+        if (data.index >= natoms_) {
             throw format_error(
                 "too many atoms in [Atoms] section: expected {} atoms, got atom with index {}",
                 natoms_, data.index
@@ -419,11 +386,11 @@ void LAMMPSDataFormat::read_atoms(Frame& frame) {
 
         if (!comment.empty()) {
             // Read the first string after the comment, and use it as atom name
-            auto name = split(trim(comment), ' ')[0];
+            auto name = split(comment, ' ')[0];
             if (names_.empty()) {
                 names_.resize(natoms_);
             }
-            names_[data.index] = name;
+            names_[data.index] = name.to_string();
         }
 
         auto atom = Atom(std::to_string(data.type));
@@ -434,9 +401,15 @@ void LAMMPSDataFormat::read_atoms(Frame& frame) {
             atom.set_mass(data.mass);
         }
 
-        if (data.molid != static_cast<size_t>(-1)) {
-            residues.resize(data.molid + 1, Residue(""));
-            residues[data.molid].add_atom(data.index);
+        if (data.molid != 0) {
+            auto residue_iter = residues.find(data.molid);
+            if (residue_iter != residues.end()) {
+                residue_iter->second.add_atom(data.index);
+            } else {
+                auto residue = Residue("", static_cast<int64_t>(data.molid));
+                residue.add_atom(data.index);
+                residues.emplace(data.molid, std::move(residue));
+            }
         }
 
         frame[data.index] = atom;
@@ -446,8 +419,8 @@ void LAMMPSDataFormat::read_atoms(Frame& frame) {
         n++;
     }
 
-    for (auto residue: residues) {
-        frame.add_residue(std::move(residue));
+    for (auto it: std::move(residues)) {
+        frame.add_residue(std::move(it.second));
     }
 
     get_next_section();
@@ -459,19 +432,19 @@ void LAMMPSDataFormat::read_masses() {
         throw format_error("missing atom types count in header");
     }
     size_t n = 0;
-    while (n < natom_types_ && !file_->eof()) {
-        auto line = file_->readline();
+    while (n < natom_types_ && !file_.eof()) {
+        auto line = file_.readline();
         split_comment(line);
         if (line.empty()) {continue;}
 
-        auto splitted = split(trim(line), ' ');
+        auto splitted = split(line, ' ');
         if (splitted.size() != 2) {
             throw format_error("bad mass specification '{}'", line);
         }
 
         auto type = splitted[0];
-        auto mass = string2double(splitted[1]);
-        masses_.emplace(std::move(type), mass);
+        auto mass = parse<double>(splitted[1]);
+        masses_.emplace(type.to_string(), mass);
         n++;
     }
 
@@ -484,23 +457,23 @@ void LAMMPSDataFormat::read_bonds(Frame& frame) {
         throw format_error("missing bonds count in header");
     }
     size_t n = 0;
-    while (n < nbonds_ && !file_->eof()) {
-        auto line = file_->readline();
+    while (n < nbonds_ && !file_.eof()) {
+        auto line = file_.readline();
         split_comment(line);
         if (line.empty()) {continue;}
 
-        auto splitted = split(trim(line), ' ');
+        auto splitted = split(line, ' ');
         if (splitted.size() != 4) {
             throw format_error("bad bond specification '{}'", line);
         }
         // LAMMPS use 1-based indexing
-        auto i = checked_cast(string2longlong(splitted[2]) - 1);
-        auto j = checked_cast(string2longlong(splitted[3]) - 1);
+        auto i = parse<size_t>(splitted[2]) - 1;
+        auto j = parse<size_t>(splitted[3]) - 1;
         frame.add_bond(i, j);
         n++;
     }
 
-    if (file_->eof() && n < nbonds_) {
+    if (file_.eof() && n < nbonds_) {
         throw format_error("end of file found before getting all bonds");
     }
 
@@ -515,25 +488,25 @@ void LAMMPSDataFormat::read_velocities(Frame& frame) {
     size_t n = 0;
     frame.add_velocities();
     auto velocities = *frame.velocities();
-    while (n < natoms_ && !file_->eof()) {
-        auto line = file_->readline();
+    while (n < natoms_ && !file_.eof()) {
+        auto line = file_.readline();
         split_comment(line);
         if (line.empty()) {continue;}
 
-        auto splitted = split(trim(line), ' ');
+        auto splitted = split(line, ' ');
         if (splitted.size() < 4) {
             throw format_error("bad velocity specification '{}'", line);
         }
         // LAMMPS use 1-based indexing
-        auto id = checked_cast(string2longlong(splitted[0]) - 1);
-        auto vx = string2double(splitted[1]);
-        auto vy = string2double(splitted[2]);
-        auto vz = string2double(splitted[3]);
+        auto id = parse<size_t>(splitted[0]) - 1;
+        auto vx = parse<double>(splitted[1]);
+        auto vy = parse<double>(splitted[2]);
+        auto vz = parse<double>(splitted[3]);
         velocities[id] = Vector3D(vx, vy, vz);
         n++;
     }
 
-    if (file_->eof() && n < nbonds_) {
+    if (file_.eof() && n < nbonds_) {
         throw format_error("end of file found before getting all velocities");
     }
 
@@ -556,7 +529,7 @@ void LAMMPSDataFormat::setup_names(Frame& frame) const {
     assert(names_.size() == frame.size());
 
     for (size_t i=0; i<frame.size(); i++) {
-        if (names_[i] != "") {
+        if (!names_[i].empty()) {
             frame[i].set_name(names_[i]);
             frame[i].set_type(names_[i]);
         }
@@ -564,7 +537,7 @@ void LAMMPSDataFormat::setup_names(Frame& frame) const {
 }
 
 
-static std::unordered_set<std::string> IGNORED_SECTIONS = {
+static std::unordered_set<string_view> IGNORED_SECTIONS = {
     "Ellipsoids", "Lines", "Triangles", "Bodies", "Pair Coeffs",
     "PairIJ Coeffs", "Bond Coeffs", "Angle Coeffs", "Dihedral Coeffs",
     "Improper Coeffs", "BondBond Coeffs", "BondAngle Coeffs",
@@ -572,12 +545,12 @@ static std::unordered_set<std::string> IGNORED_SECTIONS = {
     "AngleAngleTorsion Coeffs", "BondBond13 Coeffs", "AngleAngle Coeffs"
 };
 
-LAMMPSDataFormat::section_t LAMMPSDataFormat::get_section(std::string line) {
+LAMMPSDataFormat::section_t LAMMPSDataFormat::get_section(string_view line) {
     auto comment = split_comment(line);
     auto section = trim(line);
     if (section == "Atoms") {
         if (!comment.empty()) {
-            atom_style_name_ = trim(comment);
+            atom_style_name_ = trim(comment).to_string();
         }
         return ATOMS;
     } else if (section == "Bonds") {
@@ -595,7 +568,7 @@ LAMMPSDataFormat::section_t LAMMPSDataFormat::get_section(std::string line) {
     } else if (IGNORED_SECTIONS.find(section) != IGNORED_SECTIONS.end()) {
         if (section.find("Coeffs") == std::string::npos) {
             // Don't send a warning for force field parameters
-            warning("Ignored section '{}' in LAMMPS data file", section);
+            warning("LAMMPS Data reader", "ignoring section '{}'", section);
         }
         return IGNORED;
     } else {
@@ -688,7 +661,7 @@ size_t DataTypes::atom_type_id(const Atom& atom) const {
     if (it != atoms_.end()) {
         return static_cast<size_t>(it - atoms_.begin());
     } else {
-        throw error("invalid atom type passed to atom_type_id. this is a bug");
+        throw error("invalid atom type passed to atom_type_id, this is a bug");
     }
 }
 
@@ -697,7 +670,7 @@ size_t DataTypes::bond_type_id(size_t type_i, size_t type_j) const {
     if (it != bonds_.end()) {
         return static_cast<size_t>(it - bonds_.begin());
     } else {
-        throw error("invalid bond type passed to bond_type_id. this is a bug");
+        throw error("invalid bond type passed to bond_type_id, this is a bug");
     }
 }
 
@@ -706,7 +679,7 @@ size_t DataTypes::angle_type_id(size_t type_i, size_t type_j, size_t type_k) con
     if (it != angles_.end()) {
         return static_cast<size_t>(it - angles_.begin());
     } else {
-        throw error("invalid angle type passed to angle_type_id. this is a bug");
+        throw error("invalid angle type passed to angle_type_id, this is a bug");
     }
 }
 
@@ -715,7 +688,7 @@ size_t DataTypes::dihedral_type_id(size_t type_i, size_t type_j, size_t type_k, 
     if (it != dihedrals_.end()) {
         return static_cast<size_t>(it - dihedrals_.begin());
     } else {
-        throw error("invalid dihedral type passed to dihedral_type_id. this is a bug");
+        throw error("invalid dihedral type passed to dihedral_type_id, this is a bug");
     }
 }
 
@@ -724,79 +697,86 @@ size_t DataTypes::improper_type_id(size_t type_i, size_t type_j, size_t type_k, 
     if (it != impropers_.end()) {
         return static_cast<size_t>(it - impropers_.begin());
     } else {
-        throw error("invalid improper type passed to improper_type_id. this is a bug");
+        throw error("invalid improper type passed to improper_type_id, this is a bug");
     }
 }
 
-void LAMMPSDataFormat::write(const Frame& frame) {
-    if (written_ || file_->mode() != File::Mode::WRITE) {
-        throw format_error("LAMMPS data format does not support multiple frames");
+void LAMMPSDataFormat::write_next(const Frame& frame) {
+    if (file_.tellpos() != 0) {
+        throw format_error("LAMMPS Data format only supports writting one frame");
     }
-    written_ = true;
-    types_ = DataTypes(frame.topology());
 
-    write_header(frame);
-    write_types();
-    write_masses();
-    write_atoms(frame);
+    auto types = DataTypes(frame.topology());
+
+    write_header(types, frame);
+    write_types(types);
+    write_masses(types);
+    write_atoms(types, frame);
     write_velocities(frame);
     auto& topology = frame.topology();
-    write_bonds(topology);
-    write_angles(topology);
-    write_dihedrals(topology);
-    write_impropers(topology);
+    write_bonds(types, topology);
+    write_angles(types, topology);
+    write_dihedrals(types, topology);
+    write_impropers(types, topology);
 }
 
-void LAMMPSDataFormat::write_header(const Frame& frame) {
+void LAMMPSDataFormat::write_header(const DataTypes& types, const Frame& frame) {
+    file_.print("LAMMPS data file -- atom_style full -- generated by chemfiles\n");
+    file_.print("{} atoms\n", frame.size());
+    file_.print("{} bonds\n", frame.topology().bonds().size());
+    file_.print("{} angles\n", frame.topology().angles().size());
+    file_.print("{} dihedrals\n", frame.topology().dihedrals().size());
+    file_.print("{} impropers\n", frame.topology().impropers().size());
+
+    file_.print("{} atom types\n", types.atoms().size());
+    file_.print("{} bond types\n", types.bonds().size());
+    file_.print("{} angle types\n", types.angles().size());
+    file_.print("{} dihedral types\n", types.dihedrals().size());
+    file_.print("{} improper types\n", types.impropers().size());
+
+    auto matrix = frame.cell().matrix();
+    file_.print("0 {} xlo xhi\n", matrix[0][0]);
+    file_.print("0 {} ylo yhi\n", matrix[1][1]);
+    file_.print("0 {} zlo zhi\n", matrix[2][2]);
     if (frame.cell().shape() == UnitCell::TRICLINIC) {
-        throw format_error("triclinic cells are not suported yet in LAMMPS data writter");
+        assert(tilt_factor(matrix, 1, 0) == 0);
+        assert(tilt_factor(matrix, 2, 0) == 0);
+        assert(tilt_factor(matrix, 2, 1) == 0);
+        file_.print("{} {} {} xy xz yz\n",
+            tilt_factor(matrix, 0, 1),
+            tilt_factor(matrix, 0, 2),
+            tilt_factor(matrix, 1, 2)
+        );
     }
 
-    fmt::print(*file_, "LAMMPS data file -- atom_style full -- generated by chemfiles\n");
-    fmt::print(*file_, "{} atoms\n", frame.size());
-    fmt::print(*file_, "{} bonds\n", frame.topology().bonds().size());
-    fmt::print(*file_, "{} angles\n", frame.topology().angles().size());
-    fmt::print(*file_, "{} dihedrals\n", frame.topology().dihedrals().size());
-    fmt::print(*file_, "{} impropers\n", frame.topology().impropers().size());
-
-    fmt::print(*file_, "{} atom types\n", types_.atoms().size());
-    fmt::print(*file_, "{} bond types\n", types_.bonds().size());
-    fmt::print(*file_, "{} angle types\n", types_.angles().size());
-    fmt::print(*file_, "{} dihedral types\n", types_.dihedrals().size());
-    fmt::print(*file_, "{} improper types\n", types_.impropers().size());
-
-    fmt::print(*file_, "0 {} xlo xhi\n", frame.cell().a());
-    fmt::print(*file_, "0 {} ylo yhi\n", frame.cell().b());
-    fmt::print(*file_, "0 {} zlo zhi\n", frame.cell().c());
-
-    fmt::print(*file_, "\n");
+    file_.print("\n");
 }
 
-void LAMMPSDataFormat::write_types() {
-    auto& atoms = types_.atoms().as_vec();
+void LAMMPSDataFormat::write_types(const DataTypes& types) {
+    auto& atoms = types.atoms().as_vec();
     if (!atoms.empty()) {
-        fmt::print(*file_, "# Pair Coeffs\n");
+        file_.print("# Pair Coeffs\n");
         for (size_t i=0; i<atoms.size(); i++) {
-            fmt::print(*file_, "# {} {}\n", i + 1, atoms[i].first);
+            file_.print("# {} {}\n", i + 1, atoms[i].first);
         }
     }
 
-    auto& bonds = types_.bonds().as_vec();
+    auto& bonds = types.bonds().as_vec();
     if (!bonds.empty()) {
-        fmt::print(*file_, "\n# Bond Coeffs\n");
+        file_.print("\n# Bond Coeffs\n");
         for (size_t i=0; i<bonds.size(); i++) {
-            fmt::print(*file_, "# {} {}-{}\n", i + 1,
+            file_.print("# {} {}-{}\n", i + 1,
                 atoms[std::get<0>(bonds[i])].first,
                 atoms[std::get<1>(bonds[i])].first
             );
         }
     }
 
-    auto& angles = types_.angles().as_vec();
+    auto& angles = types.angles().as_vec();
     if (!angles.empty()) {
-        fmt::print(*file_, "\n# Angle Coeffs\n");
+        file_.print("\n# Angle Coeffs\n");
         for (size_t i=0; i<angles.size(); i++) {
-            fmt::print(*file_, "# {} {}-{}-{}\n", i + 1,
+            file_.print("# {} {}-{}-{}\n", i + 1,
                 atoms[std::get<0>(angles[i])].first,
                 atoms[std::get<1>(angles[i])].first,
                 atoms[std::get<2>(angles[i])].first
@@ -804,11 +784,11 @@ void LAMMPSDataFormat::write_types() {
         }
     }
 
-    auto& dihedrals = types_.dihedrals().as_vec();
+    auto& dihedrals = types.dihedrals().as_vec();
     if (!dihedrals.empty()) {
-        fmt::print(*file_, "\n# Dihedrals Coeffs\n");
+        file_.print("\n# Dihedrals Coeffs\n");
         for (size_t i=0; i<dihedrals.size(); i++) {
-            fmt::print(*file_, "# {} {}-{}-{}-{}\n", i + 1,
+            file_.print("# {} {}-{}-{}-{}\n", i + 1,
                 atoms[std::get<0>(dihedrals[i])].first,
                 atoms[std::get<1>(dihedrals[i])].first,
                 atoms[std::get<2>(dihedrals[i])].first,
@@ -817,11 +797,11 @@ void LAMMPSDataFormat::write_types() {
         }
     }
 
-    auto& impropers = types_.impropers().as_vec();
+    auto& impropers = types.impropers().as_vec();
     if (!impropers.empty()) {
-        fmt::print(*file_, "\n# Impropers Coeffs\n");
+        file_.print("\n# Impropers Coeffs\n");
         for (size_t i=0; i<impropers.size(); i++) {
-            fmt::print(*file_, "# {} {}-{}-{}-{}\n", i + 1,
+            file_.print("# {} {}-{}-{}-{}\n", i + 1,
                 atoms[std::get<0>(impropers[i])].first,
                 atoms[std::get<1>(impropers[i])].first,
                 atoms[std::get<2>(impropers[i])].first,
@@ -831,26 +811,25 @@ void LAMMPSDataFormat::write_types() {
     }
 }
 
-void LAMMPSDataFormat::write_masses() {
-    fmt::print(*file_, "\nMasses\n\n");
-    auto& atoms = types_.atoms().as_vec();
+void LAMMPSDataFormat::write_masses(const DataTypes& types) {
+    file_.print("\nMasses\n\n");
+    auto& atoms = types.atoms().as_vec();
     for (size_t i=0; i<atoms.size(); i++) {
-        fmt::print(*file_, "{} {} # {}\n", i + 1, atoms[i].second, atoms[i].first);
+        file_.print("{} {} # {}\n", i + 1, atoms[i].second, atoms[i].first);
     }
 }
 
-void LAMMPSDataFormat::write_atoms(const Frame& frame) {
-    fmt::print(*file_, "\nAtoms # full\n\n");
+void LAMMPSDataFormat::write_atoms(const DataTypes& types, const Frame& frame) {
+    file_.print("\nAtoms # full\n\n");
     auto positions = frame.positions();
+    auto molids = guess_molecules(frame);
     for (size_t i=0; i<frame.size(); i++) {
         auto& atom = frame.topology()[i];
-        // TODO: get molecule id and name
-        auto molid = i;
-        auto molname = "";
-        fmt::print(*file_, "{} {} {} {} {} {} {} # {} {}\n",
-            i + 1, molid + 1, types_.atom_type_id(atom) + 1, atom.charge(),
+        auto molid = molids[i];
+        file_.print("{} {} {} {} {} {} {} # {}\n",
+            i + 1, molid + 1, types.atom_type_id(atom) + 1, atom.charge(),
             positions[i][0], positions[i][1], positions[i][2],
-            atom.type(), molname
+            atom.type()
         );
     }
 }
@@ -858,60 +837,60 @@ void LAMMPSDataFormat::write_atoms(const Frame& frame) {
 void LAMMPSDataFormat::write_velocities(const Frame& frame) {
     if (!frame.velocities()) { return; }
 
-    fmt::print(*file_, "\nVelocities\n\n");
+    file_.print("\nVelocities\n\n");
     auto velocities = *frame.velocities();
     for (size_t i=0; i<frame.size(); i++) {
-        fmt::print(*file_, "{} {} {} {}\n",
+        file_.print("{} {} {} {}\n",
             i + 1, velocities[i][0], velocities[i][1], velocities[i][2]
         );
     }
 }
 
-void LAMMPSDataFormat::write_bonds(const Topology& topology) {
+void LAMMPSDataFormat::write_bonds(const DataTypes& types, const Topology& topology) {
     if (topology.bonds().empty()) { return; }
 
-    fmt::print(*file_, "\nBonds\n\n");
+    file_.print("\nBonds\n\n");
     size_t bond_id = 1;
     for (auto bond: topology.bonds()) {
-        auto type_i = types_.atom_type_id(topology[bond[0]]);
-        auto type_j = types_.atom_type_id(topology[bond[1]]);
-        auto bond_type_id = types_.bond_type_id(type_i, type_j);
-        fmt::print(*file_, "{} {} {} {}\n",
+        auto type_i = types.atom_type_id(topology[bond[0]]);
+        auto type_j = types.atom_type_id(topology[bond[1]]);
+        auto bond_type_id = types.bond_type_id(type_i, type_j);
+        file_.print("{} {} {} {}\n",
             bond_id, bond_type_id + 1, bond[0] + 1, bond[1] + 1
         );
         bond_id++;
     }
 }
 
-void LAMMPSDataFormat::write_angles(const Topology& topology) {
+void LAMMPSDataFormat::write_angles(const DataTypes& types, const Topology& topology) {
     if (topology.angles().empty()) { return; }
 
-    fmt::print(*file_, "\nAngles\n\n");
+    file_.print("\nAngles\n\n");
     size_t angle_id = 1;
     for (auto angle: topology.angles()) {
-        auto type_i = types_.atom_type_id(topology[angle[0]]);
-        auto type_j = types_.atom_type_id(topology[angle[1]]);
-        auto type_k = types_.atom_type_id(topology[angle[2]]);
-        auto angle_type_id = types_.angle_type_id(type_i, type_j, type_k);
-        fmt::print(*file_, "{} {} {} {} {}\n",
+        auto type_i = types.atom_type_id(topology[angle[0]]);
+        auto type_j = types.atom_type_id(topology[angle[1]]);
+        auto type_k = types.atom_type_id(topology[angle[2]]);
+        auto angle_type_id = types.angle_type_id(type_i, type_j, type_k);
+        file_.print("{} {} {} {} {}\n",
             angle_id, angle_type_id + 1, angle[0] + 1, angle[1] + 1, angle[2] + 1
         );
         angle_id++;
     }
 }
 
-void LAMMPSDataFormat::write_dihedrals(const Topology& topology) {
+void LAMMPSDataFormat::write_dihedrals(const DataTypes& types, const Topology& topology) {
     if (topology.dihedrals().empty()) { return; }
 
-    fmt::print(*file_, "\nDihedrals\n\n");
+    file_.print("\nDihedrals\n\n");
     size_t dihedral_id = 1;
     for (auto dihedral: topology.dihedrals()) {
-        auto type_i = types_.atom_type_id(topology[dihedral[0]]);
-        auto type_j = types_.atom_type_id(topology[dihedral[1]]);
-        auto type_k = types_.atom_type_id(topology[dihedral[2]]);
-        auto type_m = types_.atom_type_id(topology[dihedral[3]]);
-        auto dihedral_type_id = types_.dihedral_type_id(type_i, type_j, type_k, type_m);
-        fmt::print(*file_, "{} {} {} {} {} {}\n",
+        auto type_i = types.atom_type_id(topology[dihedral[0]]);
+        auto type_j = types.atom_type_id(topology[dihedral[1]]);
+        auto type_k = types.atom_type_id(topology[dihedral[2]]);
+        auto type_m = types.atom_type_id(topology[dihedral[3]]);
+        auto dihedral_type_id = types.dihedral_type_id(type_i, type_j, type_k, type_m);
+        file_.print("{} {} {} {} {} {}\n",
             dihedral_id, dihedral_type_id + 1,
             dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1
         );
@@ -919,18 +898,18 @@ void LAMMPSDataFormat::write_dihedrals(const Topology& topology) {
     }
 }
 
-void LAMMPSDataFormat::write_impropers(const Topology& topology) {
+void LAMMPSDataFormat::write_impropers(const DataTypes& types, const Topology& topology) {
     if (topology.impropers().empty()) { return; }
 
-    fmt::print(*file_, "\nImpropers\n\n");
+    file_.print("\nImpropers\n\n");
     size_t improper_id = 1;
     for (auto improper: topology.impropers()) {
-        auto type_i = types_.atom_type_id(topology[improper[0]]);
-        auto type_j = types_.atom_type_id(topology[improper[1]]);
-        auto type_k = types_.atom_type_id(topology[improper[2]]);
-        auto type_m = types_.atom_type_id(topology[improper[3]]);
-        auto improper_type_id = types_.improper_type_id(type_i, type_j, type_k, type_m);
-        fmt::print(*file_, "{} {} {} {} {} {}\n",
+        auto type_i = types.atom_type_id(topology[improper[0]]);
+        auto type_j = types.atom_type_id(topology[improper[1]]);
+        auto type_k = types.atom_type_id(topology[improper[2]]);
+        auto type_m = types.atom_type_id(topology[improper[3]]);
+        auto improper_type_id = types.improper_type_id(type_i, type_j, type_k, type_m);
+        file_.print("{} {} {} {} {} {}\n",
             improper_id, improper_type_id + 1,
             improper[0] + 1, improper[1] + 1, improper[2] + 1, improper[3] + 1
         );
@@ -938,17 +917,18 @@ void LAMMPSDataFormat::write_impropers(const Topology& topology) {
     }
 }
 
-std::string split_comment(std::string& line) {
-    std::string comment;
+string_view split_comment(string_view& line) {
     auto position = line.find('#');
     if (position != std::string::npos) {
-        comment = line.substr(position + 1);
-        line.erase(position);
+        auto comment = line.substr(position + 1);
+        line.remove_suffix(line.size() - position);
+        return comment;
+    } else {
+        return "";
     }
-    return comment;
 }
 
-bool is_unused_header(const std::string& line) {
+bool is_unused_header(string_view line) {
     return (line.find("angles") != std::string::npos) ||
            (line.find("dihedrals") != std::string::npos) ||
            (line.find("impropers") != std::string::npos) ||
@@ -967,15 +947,80 @@ bool is_unused_header(const std::string& line) {
            (line.find("bodies") != std::string::npos);
 }
 
+std::vector<size_t> guess_molecules(const Frame& frame) {
+    // Initialize the molids vector with each atom in its own molecule
+    auto molids = std::vector<size_t>();
+    molids.reserve(frame.size());
+    for (size_t i=0; i<frame.size(); i++) {
+        molids.push_back(i);
+    }
 
-size_t checked_cast(long long int value) {
-    if (value < 0) {
-        throw format_error("invalid integer: should be positive, is {}", value);
-    } else if (sizeof(long long) < sizeof(size_t) && value > static_cast<long long>(SIZE_MAX)) {
-        throw format_error(
-            "invalid integer: {} is bigger than the available size_t", value
-        );
+    for (auto bond: frame.topology().bonds()) {
+        auto i = bond[0];
+        auto j = bond[1];
+
+        // Merge the bigger molid in the smaller one
+        size_t new_id = molids[i];
+        size_t old_id = molids[j];
+        if (molids[i] > molids[j]) {
+            new_id = molids[j];
+            old_id = molids[i];
+        }
+
+        for (auto& molid: molids) {
+            if (molid == old_id) {
+                molid = new_id;
+            }
+        }
+    }
+
+    // Make sure the molids are consecutive
+    std::unordered_map<size_t, size_t> molids_mapping;
+    for (auto& molid: molids) {
+        auto it = molids_mapping.find(molid);
+        if (it != molids_mapping.end()) {
+            molid = it->second;
+        } else {
+            // We've not found this id yet
+            auto new_id = molids_mapping.size();
+            molids_mapping.insert({molid, new_id});
+            molid = new_id;
+        }
+    }
+
+    return molids;
+}
+
+double tilt_factor(const Matrix3D& matrix, size_t i, size_t j) {
+    assert(i != j);
+    auto factor = matrix[i][j];
+    auto a = matrix[i][i];
+    if (factor >= 0) {
+        while (fabs(factor) > a / 2) {
+            factor -= a;
+        }
     } else {
-        return static_cast<size_t>(value);
+        while (factor < -a / 2) {
+            factor += a;
+        }
+    }
+
+    // Correct for rounding errors in calculations of sin/cos
+    if (fabs(factor) < 1e-15) {
+        factor = 0;
+    }
+
+    return factor;
+}
+
+optional<uint64_t> LAMMPSDataFormat::forward() {
+    // LAMMPS Data only supports one step, so always act like there is only one
+    auto position = file_.tellpos();
+    if (position == 0) {
+        // advance the pointer for the next call
+        file_.readline();
+        return position;
+    } else {
+        return nullopt;
     }
 }

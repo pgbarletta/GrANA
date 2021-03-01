@@ -1,8 +1,17 @@
 // Chemfiles, a modern library for chemistry file reading and writing
 // Copyright (C) Guillaume Fraux and contributors -- BSD license
 
-#include "chemfiles/ErrorFmt.hpp"
+#include <cstddef>
+#include <vector>
+#include <unordered_map>
+
+#include "chemfiles/Atom.hpp"
+#include "chemfiles/Connectivity.hpp"
+#include "chemfiles/error_fmt.hpp"
+#include "chemfiles/Residue.hpp"
 #include "chemfiles/Topology.hpp"
+#include "chemfiles/sorted_set.hpp"
+#include "chemfiles/external/optional.hpp"
 
 using namespace chemfiles;
 
@@ -27,7 +36,7 @@ void Topology::reserve(size_t size) {
     atoms_.reserve(size);
 }
 
-void Topology::add_bond(size_t atom_i, size_t atom_j) {
+void Topology::add_bond(size_t atom_i, size_t atom_j, Bond::BondOrder bond_order) {
     if (atom_i >= size() || atom_j >= size()) {
         throw out_of_bounds(
             "out of bounds atomic index in `Topology::add_bond`: "
@@ -35,7 +44,7 @@ void Topology::add_bond(size_t atom_i, size_t atom_j) {
             size(), atom_i, atom_j
         );
     }
-    connect_.add_bond(atom_i, atom_j);
+    connect_.add_bond(atom_i, atom_j, bond_order);
 }
 
 void Topology::remove_bond(size_t atom_i, size_t atom_j) {
@@ -49,6 +58,17 @@ void Topology::remove_bond(size_t atom_i, size_t atom_j) {
     connect_.remove_bond(atom_i, atom_j);
 }
 
+Bond::BondOrder Topology::bond_order(size_t atom_i, size_t atom_j) const {
+    if (atom_i >= size() || atom_j >= size()) {
+        throw out_of_bounds(
+            "out of bounds atomic index in `Topology::bond_order`: "
+            "we have {} atoms, but the bond indexes are {} and {}",
+            size(), atom_i, atom_j
+        );
+    }
+
+    return connect_.bond_order(atom_i, atom_j);
+}
 
 void Topology::remove(size_t i) {
     if (i >= size()) {
@@ -59,6 +79,7 @@ void Topology::remove(size_t i) {
         );
     }
     atoms_.erase(atoms_.begin() + static_cast<std::ptrdiff_t>(i));
+
     // Remove all bonds with the removed atom
     auto bonds = connect_.bonds();
     for (auto& bond : bonds) {
@@ -66,12 +87,26 @@ void Topology::remove(size_t i) {
             connect_.remove_bond(bond[0], bond[1]);
         }
     }
-    // Shift all bonds indexes
+    // remove the atom from the corresponding residue
+    auto it = residue_mapping_.find(i);
+    if (it != residue_mapping_.end()) {
+        residues_[it->second].remove(i);
+    }
+
+    // shift all bonds indexes
     connect_.atom_removed(i);
+    // shift all residue atoms
+    for (auto& res : residues_) {
+        res.atom_removed(i);
+    }
 }
 
 const std::vector<Bond>& Topology::bonds() const {
     return connect_.bonds().as_vec();
+}
+
+const std::vector<Bond::BondOrder>& Topology::bond_orders() const {
+    return connect_.bond_orders();
 }
 
 const std::vector<Angle>& Topology::angles() const {
@@ -86,14 +121,6 @@ const std::vector<Improper>& Topology::impropers() const {
     return connect_.impropers().as_vec();
 }
 
-bool Topology::is_bond(size_t i, size_t j) const {
-    if (i == j) {
-        return false;
-    }
-    auto bonds = connect_.bonds();
-    return bonds.find(Bond(i, j)) != bonds.end();
-}
-
 void Topology::add_residue(Residue residue) {
     for (auto i: residue) {
         auto it = residue_mapping_.find(i);
@@ -104,10 +131,10 @@ void Topology::add_residue(Residue residue) {
             );
         }
     }
-    auto resid = residues_.size();
+    auto res_index = residues_.size();
     residues_.emplace_back(std::move(residue));
     for (auto i: residues_.back()) {
-        residue_mapping_.insert({i, resid});
+        residue_mapping_.insert({i, res_index});
     }
 }
 
@@ -115,9 +142,10 @@ bool Topology::are_linked(const Residue& first, const Residue& second) const {
     if (first == second) {
         return true;
     }
+    auto bonds = connect_.bonds();
     for (auto i: first) {
         for (auto j: second) {
-            if (is_bond(i, j)) {
+            if (bonds.find({i, j}) != bonds.end()) {
                 return true;
             }
         }

@@ -4,22 +4,27 @@
 #ifndef CHEMFILES_FORMAT_NC_HPP
 #define CHEMFILES_FORMAT_NC_HPP
 
-#include "chemfiles/types.hpp"
+#include <string>
+#include <vector>
+
+#include "chemfiles/File.hpp"
 #include "chemfiles/Format.hpp"
+
 #include "chemfiles/files/NcFile.hpp"
-#include "chemfiles/external/span.hpp"
 
 namespace chemfiles {
 
+class Frame;
 class UnitCell;
-class Topology;
+class Vector3D;
+class FormatMetadata;
 
-/// [Amber NetCDF][NetCDF] file format reader.
-///
-/// [NetCDF]: http://ambermd.org/netcdf/nctraj.xhtml
+template <class T> class span;
+
+/// Amber NetCDF file format reader.
 class AmberNetCDFFormat final: public Format {
 public:
-    AmberNetCDFFormat(const std::string& path, File::Mode mode);
+    AmberNetCDFFormat(std::string path, File::Mode mode, File::Compression compression);
 
     void read_step(size_t step, Frame& frame) override;
     void read(Frame& frame) override;
@@ -48,7 +53,7 @@ private:
     bool validated_;
 };
 
-template<> FormatInfo format_information<AmberNetCDFFormat>();
+template<> const FormatMetadata& format_metadata<AmberNetCDFFormat>();
 
 } // namespace chemfiles
 

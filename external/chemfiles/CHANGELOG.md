@@ -1,9 +1,129 @@
 # Change Log
 
 All notable changes to this project will be documented in this file.
-This project adheres to [Semantic Versioning](http://semver.org/).
+This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Next Release (current master)
+
+### New features
+
+* Added ability to read and write files directly in-memory. See
+  `Trajectory::memory_reader`; `Trajectory::memory_writer`;
+  `Trajectory::memory_buffer`; `chfl_trajectory_memory_reader`;
+  `chfl_trajectory_memory_writer` and `chfl_trajectory_memory_buffer`.
+* Added support for appending to gzip (.gz) compressed trajectories.
+* Added support for sub-selection in numerical functions, for example
+  `distance(#1, name O)`.
+* Added read and write support for CIF format.
+* Changed the UnitCell representation to the full cell matrix instead of
+  a/b/c/alpha/beta/gamma
+* Added `chemfiles::formats_list` function to get a list of formats
+  and associated metadata.
+
+### Changes to the C API
+
+* Added missing `chfl_frame_clear_bonds` and `chfl_topology_clear_bonds`.
+* Added `chfl_cell_from_matrix` and changed parameters to `chfl_cell`, removed
+  `chfl_cell_triclinic`.
+* Added `chfl_formats_list` function to get a list of formats and
+  associated metadata.
+
+### Changes in supported formats
+
+* Added read and write support for extended XYZ. The XYZ format now default to
+  extended output, and read extended files. Extended XYZ allow storing unit
+  cell and arbitrary atomic properties.
+
+## 0.9.3 (5 Feb 2020)
+
+* Fix a bug in the PDB format where no atomic name/type was read from short
+  ATOM/HETATM records.
+* Fix a few bugs related to UnitCell Matrix and infinite UnitCell construction
+
+## 0.9.2 (18 Dec 2019)
+
+* When compiling chemfiles as a shared library, the dependencies symbols are
+  now hidden. This should prevent clashes between say chemfiles's zlib and the
+  system zlib.
+* Cache sub-selection (the 'name O' in 'is_bonded(#1, name O)'), reducing
+  selection evaluation time by a huge margin.
+
+### Changes in supported formats
+
+* Added read and write support for CML (Chemical Markup Language) files, a XML
+  based format.
+* Added a native implementation of XTC and TRR formats, replacing the VMD
+  molfile version. The new code supports reading and writing files, should be
+  faster and use less memory.
+* Remove the ability to read frames from a trajectory that was opened in
+  append mode. This mode is now write only.
+* Added support for bzip2 (.bz2) compressed files when reading and writing
+
+## 0.9.1 (13 Mar 2019)
+
+* Fix a bug with memory allocation in the C API. The allocator did not remove
+  pointers as soon as `chfl_free` was called, which leaded to an error when the
+  system allocator re-used the pointers.
+
+## 0.9.0 (18 Nov 2018)
+
+* Direct reading and writing of compressed files. gzip and lzma (.xz) formats
+  are supported.
+* GROMACS .gro files now supported through custom implementation.
+* Properties are now supported in the `Residue` class. They are accessed using
+  `Residue::set` and `Residue::get`.
+* The topology of residues is now automatically set using a lookup table for the
+  PDB format.
+* `Frame::guess_topology` was renamed to `Frame::guess_bonds`.
+* The selection engine has been rewritten to add support for more complex
+  selections:
+    * it is now possible to use mathematical expressions in selections such as
+      `x^2 - y ^2 < sqrt(z^2 + 25)`;
+    * it is now possible to access geometrical properties in such mathematical
+      expressions: `distance(#1, #2)`, `angle(#1, #2, #3)`, `dihedral(#1, #2,
+      #3, #4)`, and `out_of_plane(#1, #2, #3, #4)` are supported;
+    * it is now possible to add constrains on the topology of the system:
+      `bonded(#1, #2)`, `is_angle(#1, #2, #3)`, `is_dihedral(#1, #2, #3, #4)`,
+      and `improper(#1, #2, #3, #4)` are supported;
+    * the topology constrains support sub-selections: instead of checking is
+      `#1` and `#2` are bonded, one can check if `#1` is bonded to any atom
+      matching a selection, for example `name O` with `bonded(#1, name O)`.
+    * When using numbers as atomic names/types, they must now be inside double
+      quotes (`name "45"`). This also allows for more exotic atomic names
+      (`name "名"`).
+    * Atomic properties can be checked, using the `[property] == Ow` syntax for
+      string properties, `[property] == 2.3` for numeric properties and
+      `[property]` for boolean properties.
+* There is only one constructor for the `Frame` class: `Frame(UnitCell cell =
+  UnitCell())`. The constructor taking a topology can be replaced with calls to
+  `Frame::add_atom` and `Frame::add_bond`.
+* Chemfiles will now read configuration from `.chemfiles.toml` or
+  `chemfiles.toml` instead of `.chemfilesrc`
+* Added `Trajectory::path` to get the file path used to create a trajectory
+* Renamed `Property::get_kind` to `Property::kind`
+* Added `Atom::properties`; `Frame::properties`; and `Residue::properties` to
+  allow iteration over all the properties in an Atom/Frame/Residue.
+
+### Changes in supported formats
+
+* Added `MarcoMolecule Transmission Format (MMTF)` support, reading via mmtf-cpp.
+* Added `Structure-Data File (SDF)` support, reading and writing.
+* Added `Cambridge Structure Search and Retrieval (CSSR)` support, reading and writing.
+* `LAMMPS Data` format now support triclinic unit cells.
+
+### Changes to the C API
+
+* Added `chfl_residue_get_property` and `chfl_residue_set_property` to provide
+  access to residue properties.
+* `chfl_frame_guess_topology` was renamed to `chfl_frame_guess_bonds`.
+* Function accessing atoms/cell/residue/topology inside a frame/topology no
+  longer make a copy. This allows for direct reading and writing inside the
+  containing frame/topology.
+* Added `chfl_trajectory_path` to get the file path used to create a trajectory
+* Added `chfl_{atom,frame,residue}_properties_count` and
+  `chfl_{atom,frame,residue}_list_properties` to list all properties in an
+  Atom/Frame/Residue
+* Replaced `chfl_*_free` by an unique `chfl_free` function
 
 ## 0.8 (14 Dec 2017)
 
@@ -49,9 +169,9 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 * Added `MOL2` format, reading mol2 files using VMD molfiles plugin.
 * Added `Molden` format, reading molden files using VMD molfiles plugin.
 
-[LAMMPS data files]: http://lammps.sandia.gov/doc/read_data.html
+[LAMMPS data files]: https://lammps.sandia.gov/doc/read_data.html
 
-### C API changes
+### Changes to the C API
 
 * Added `chfl_add_configuration` to add more configuration files.
 * Renamed `chfl_vector_t` to `chfl_vector3d`, `chfl_match_t` to `cfl_match`; and
@@ -112,7 +232,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 * Add read support for TNG files, an new portable and compressed binary format
   used by GROMACS.
 
-### C API changes
+### Changes to the C API
 
 * All the integers at C boundary have a fixed size, most of the time using
   `uint64_t`.

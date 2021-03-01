@@ -4,22 +4,42 @@
 #ifndef CHEMFILES_UNREACHABLE_HPP
 #define CHEMFILES_UNREACHABLE_HPP
 
-#include "chemfiles/Error.hpp"
-
 #ifndef __has_builtin
   #define __has_builtin(x) 0
 #endif
 
-#if __has_builtin(__builtin_unreachable)
-    #define unreachable() __builtin_unreachable()
-#elif GCC_VERSION >= 40500
-    #define unreachable() __builtin_unreachable()
-#elif defined(_MSC_VER)
-    #define unreachable() __assume(false)
+#ifdef __GNUC__
+#define GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
 #else
-    #define unreachable() do {                     \
-        throw Error("entered unreachable code");   \
-    } while (false)
+#define GCC_VERSION 0
 #endif
+
+#if __has_builtin(__builtin_unreachable) || GCC_VERSION >= 405
+    #define HAS_BUILTIN_UNREACHABLE 1
+#else
+    #define HAS_BUILTIN_UNREACHABLE 0
+#endif
+
+#undef GCC_VERSION
+
+#if !HAS_BUILTIN_UNREACHABLE && !defined(_MSC_VER)
+#include "chemfiles/Error.hpp"
+#endif
+
+namespace chemfiles {
+
+[[noreturn]] inline void unreachable() {
+#if HAS_BUILTIN_UNREACHABLE
+    __builtin_unreachable();
+#elif defined(_MSC_VER)
+    __assume(false);
+#else
+    throw Error("entered unreachable code");
+#endif
+}
+
+#undef HAS_BUILTIN_UNREACHABLE
+
+}
 
 #endif

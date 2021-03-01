@@ -1,64 +1,77 @@
 // Chemfiles, a modern library for chemistry file reading and writing
 // Copyright (C) Guillaume Fraux and contributors -- BSD license
 
-#include <cctype>
+#include <cassert>
+#include <cstdint>
+#include <string>
+#include <unordered_map>
 
 #include "chemfiles/Atom.hpp"
-#include "chemfiles/periodic.hpp"
+#include "chemfiles/Configuration.hpp"
+#include "chemfiles/periodic_table.hpp"
+
+#include "chemfiles/utils.hpp"
+#include "chemfiles/external/optional.hpp"
 
 using namespace chemfiles;
 
-static char to_upper(char c) {
-    return static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+static std::string normalize_atomic_name(const std::string& type) {
+    assert(type.length() <= 2);
+    std::string normalized = type;
+    if (type.length() == 1) {
+        normalized[0] = to_ascii_uppercase(normalized[0]);
+    } else if (type.length() == 2) {
+        normalized[0] = to_ascii_uppercase(normalized[0]);
+        normalized[1] = to_ascii_lowercase(normalized[1]);
+    }
+    return normalized;
 }
 
-static char to_lower(char c) {
-    return static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-}
-
-static optional<const ElementData&> find_element(const std::string& name) {
-    std::map<std::string, ElementData>::const_iterator periodic;
-    std::string normalized;
-    if (name.length() == 1) {
-        normalized = name;
-        normalized[0] = to_upper(normalized[0]);
-
-        periodic = PERIODIC_INFORMATION.find(normalized);
-    } else if (name.length() == 2) {
-        normalized = name;
-        normalized[0] = to_upper(normalized[0]);
-        normalized[1] = to_lower(normalized[1]);
-
-        periodic = PERIODIC_INFORMATION.find(normalized);
+optional<const AtomicData&> chemfiles::find_in_periodic_table(const std::string& type) {
+    atomic_data_map::const_iterator it;
+    if (type.length() <= 2) {
+        it = PERIODIC_TABLE.find(normalize_atomic_name(type));
     } else {
-        periodic = PERIODIC_INFORMATION.find(name);
+        it = PERIODIC_TABLE.find(type);
     }
 
-    if (periodic != PERIODIC_INFORMATION.end()) {
-        return periodic->second;
+    if (it != PERIODIC_TABLE.end()) {
+        return it->second;
     } else {
         return nullopt;
+    }
+}
+
+static optional<const AtomicData&> find_element(const std::string& type) {
+    // Look in the configuration first, and then in the periodic table
+    auto element = Configuration::atom_data(type);
+    if (element) {
+        return element;
+    } else {
+        return find_in_periodic_table(type);
     }
 }
 
 Atom::Atom(std::string name): name_(std::move(name)), type_(name_) {
     auto element = find_element(type_);
     if (element) {
-        mass_ = element->mass;
+        mass_ = element->mass.value_or(0);
+        charge_ = element->charge.value_or(0);
     }
 }
 
 Atom::Atom(std::string name, std::string type): name_(std::move(name)), type_(std::move(type)) {
     auto element = find_element(type_);
     if (element) {
-        mass_ = element->mass;
+        mass_ = element->mass.value_or(0);
+        charge_ = element->charge.value_or(0);
     }
 }
 
 optional<std::string> Atom::full_name() const {
     auto element = find_element(type_);
     if (element) {
-        return element->name;
+        return element->full_name;
     } else {
         return nullopt;
     }
@@ -89,12 +102,4 @@ optional<uint64_t> Atom::atomic_number() const {
     } else {
         return nullopt;
     }
-}
-
-void Atom::set(std::string name, Property value) {
-    properties_.set(std::move(name), std::move(value));
-}
-
-optional<const Property&> Atom::get(const std::string& name) const {
-    return properties_.get(name);
 }

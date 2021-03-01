@@ -1,9 +1,25 @@
 .. _capi-property:
 
-Function manipulating ``CHFL_PROPERTY``
----------------------------------------
+``CHFL_PROPERTY``
+-----------------
 
 .. doxygentypedef:: CHFL_PROPERTY
+
+.. only:: html
+
+    Here is the full list of functions acting on :cpp:type:`CHFL_PROPERTY`:
+
+    - :cpp:func:`chfl_property_bool`
+    - :cpp:func:`chfl_property_double`
+    - :cpp:func:`chfl_property_string`
+    - :cpp:func:`chfl_property_vector3d`
+    - :cpp:func:`chfl_property_get_kind`
+    - :cpp:func:`chfl_property_get_bool`
+    - :cpp:func:`chfl_property_get_double`
+    - :cpp:func:`chfl_property_get_string`
+    - :cpp:func:`chfl_property_get_vector3d`
+
+    --------------------------------------------------------------------
 
 .. doxygenfunction:: chfl_property_bool
 
@@ -22,5 +38,3 @@ Function manipulating ``CHFL_PROPERTY``
 .. doxygenfunction:: chfl_property_get_string
 
 .. doxygenfunction:: chfl_property_get_vector3d
-
-.. doxygenfunction:: chfl_property_free

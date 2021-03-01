@@ -4,13 +4,15 @@
 #ifndef CHEMFILES_TOPOLOGY_HPP
 #define CHEMFILES_TOPOLOGY_HPP
 
+#include <string>
 #include <vector>
 #include <unordered_map>
 
 #include "chemfiles/Atom.hpp"
 #include "chemfiles/Connectivity.hpp"
 #include "chemfiles/Residue.hpp"
-#include "chemfiles/exports.hpp"
+#include "chemfiles/Error.hpp"
+#include "chemfiles/exports.h"
 
 #include "chemfiles/external/optional.hpp"
 
@@ -26,7 +28,7 @@ namespace chemfiles {
 /// It is also possible to iterate over a `Topology`, yielding all the atoms in
 /// the system.
 ///
-/// @example{tests/doc/topology/iterate.cpp}
+/// @example{topology/iterate.cpp}
 class CHFL_EXPORT Topology final {
 public:
     using iterator = std::vector<Atom>::iterator;
@@ -34,7 +36,7 @@ public:
 
     /// Construct a new empty topology
     ///
-    /// @example{tests/doc/topology/topology.cpp}
+    /// @example{topology/topology.cpp}
     Topology() = default;
 
     ~Topology() = default;
@@ -45,14 +47,14 @@ public:
 
     /// Get a reference to the atom at the position `index`.
     ///
-    /// @example{tests/doc/topology/index.cpp}
+    /// @example{topology/index.cpp}
     ///
     /// @param index the atomic index
     /// @throws OutOfBounds if `index` is greater than `size()`
     Atom& operator[](size_t index) {
         if (index >= size()) {
             throw OutOfBounds(
-                "Atomic index out of bounds in topology: we have "
+                "atomic index out of bounds in topology: we have "
                 + std::to_string(size()) + " atoms, but the index is "
                 + std::to_string(index)
             );
@@ -62,14 +64,14 @@ public:
 
     /// Get a const reference to the atom at the position `index`.
     ///
-    /// @example{tests/doc/topology/index.cpp}
+    /// @example{topology/index.cpp}
     ///
     /// @param index the atomic index
     /// @throws OutOfBounds if `index` is greater than `size()`
     const Atom& operator[](size_t index) const {
         if (index >= size()) {
             throw OutOfBounds(
-                "Atomic index out of bounds in topology: we have "
+                "atomic index out of bounds in topology: we have "
                 + std::to_string(size()) + " atoms, but the index is "
                 + std::to_string(index)
             );
@@ -86,7 +88,7 @@ public:
 
     /// Add an `atom` at the end of this topology.
     ///
-    /// @example{tests/doc/topology/add_atom.cpp}
+    /// @example{topology/add_atom.cpp}
     ///
     /// @param atom the new atom to add
     void add_atom(Atom atom);
@@ -97,7 +99,7 @@ public:
     /// This function modify the index of all the atoms after `i`, and modify
     /// the bond list accordingly.
     ///
-    /// @example{tests/doc/topology/remove.cpp}
+    /// @example{topology/remove.cpp}
     ///
     /// @param i the index of the atom to remove
     /// @throws OutOfBounds if `i` is greater than size()
@@ -106,29 +108,42 @@ public:
     /// Add a bond in the system, between the atoms at index `atom_i` and
     /// `atom_j`.
     ///
-    /// @example{tests/doc/topology/add_bond.cpp}
+    /// @example{topology/add_bond.cpp}
     ///
     /// @param atom_i the index of the first atom in the bond
     /// @param atom_j the index of the second atom in the bond
+    /// @param bond_order the bond order for the bond added
     /// @throws OutOfBounds if `atom_i` or `atom_j` are greater than `size()`
     /// @throws Error if `atom_i == atom_j`, as this is an invalid bond
-    void add_bond(size_t atom_i, size_t atom_j);
+    void add_bond(size_t atom_i, size_t atom_j, Bond::BondOrder bond_order = Bond::UNKNOWN);
 
     /// Remove a bond in the system, between the atoms at index `atom_i` and
     /// `atom_j`.
     ///
     /// If the bond does not exist, this does nothing.
     ///
-    /// @example{tests/doc/topology/remove_bond.cpp}
+    /// @example{topology/remove_bond.cpp}
     ///
     /// @param atom_i the index of the first atom in the bond
     /// @param atom_j the index of the second atom in the bond
     /// @throws OutOfBounds if `atom_i` or `atom_j` are greater than `size()`
     void remove_bond(size_t atom_i, size_t atom_j);
 
+    /// Get the bond order for the given bond
+    ///
+    /// If the bond does not exist, this will thrown an Error.
+    ///
+    /// @example{topology/bond_order.cpp}
+    ///
+    /// @param atom_i the index of the first atom in the bond
+    /// @param atom_j the index of the second atom in the bond
+    /// @throws OutOfBounds if `atom_i` or `atom_j` are greater than `size()`
+    /// @throws Error if no bond between `atom_i` and `atom_j` exists.
+    Bond::BondOrder bond_order(size_t atom_i, size_t atom_j) const;
+
     /// Get the number of atoms in the topology
     ///
-    /// @example{tests/doc/topology/size.cpp}
+    /// @example{topology/size.cpp}
     size_t size() const {
         return atoms_.size();
     }
@@ -141,7 +156,7 @@ public:
     /// If the new size if smaller than the old one, all atoms and connectivity
     /// elements after the new size are removed.
     ///
-    /// @example{tests/doc/topology/resize.cpp}
+    /// @example{topology/resize.cpp}
     ///
     /// @param size the new size of the topology
     void resize(size_t size);
@@ -151,7 +166,7 @@ public:
     /// This function does not change the actual number of atoms in the
     /// topology, and should be used as an optimisation.
     ///
-    /// @example{tests/doc/topology/reserve.cpp}
+    /// @example{topology/reserve.cpp}
     ///
     /// @param size the number of elements to reserve memory for
     void reserve(size_t size);
@@ -162,8 +177,18 @@ public:
     /// which mean it is possible to look for a bond in the list using a binary
     /// search (`std::lower_bound`).
     ///
-    /// @example{tests/doc/topology/bonds.cpp}
+    /// @example{topology/bonds.cpp}
     const std::vector<Bond>& bonds() const;
+
+    /// Get the bond orders in the system.
+    ///
+    /// The bond orders are sorted so that the index of each bond is the same as
+    /// its index in the array returned by `Topology::bonds`. This means that
+    /// the bond order for `Topology::bonds()[index]` would be given by
+    /// `bond_orders()[index]`.
+    ///
+    /// @example{topology/bond_order.cpp}
+    const std::vector<Bond::BondOrder>& bond_orders() const;
 
     /// Get the angles in the system
     ///
@@ -171,7 +196,7 @@ public:
     /// Angle&)`, which mean it is possible to look for an angle in the list
     /// using a binary search (`std::lower_bound`).
     ///
-    /// @example{tests/doc/topology/angles.cpp}
+    /// @example{topology/angles.cpp}
     const std::vector<Angle>& angles() const;
 
     /// Get the dihedral angles in the system
@@ -180,7 +205,7 @@ public:
     /// Dihedral&)`, which mean it is possible to look for a dihedral in the
     /// list using a binary search (`std::lower_bound`).
     ///
-    /// @example{tests/doc/topology/dihedrals.cpp}
+    /// @example{topology/dihedrals.cpp}
     const std::vector<Dihedral>& dihedrals() const;
 
     /// Get the improper dihedral angles in the system
@@ -189,20 +214,20 @@ public:
     /// Improper&)`, which mean it is possible to look for an improper in the
     /// list using a binary search (`std::lower_bound`).
     ///
-    /// @example{tests/doc/topology/impropers.cpp}
+    /// @example{topology/impropers.cpp}
     const std::vector<Improper>& impropers() const;
 
     /// Remove all bonding information in the topology (bonds, angles and
     /// dihedrals)
     ///
-    /// @example{tests/doc/topology/clear_bonds.cpp}
+    /// @example{topology/clear_bonds.cpp}
     void clear_bonds() {
         connect_ = Connectivity();
     }
 
     /// Add a `residue` to this topology.
     ///
-    /// @example{tests/doc/topology/add_residue.cpp}
+    /// @example{topology/add_residue.cpp}
     ///
     /// @param residue the residue to add to this topology
     /// @throw chemfiles::Error if any atom in the `residue` is already in
@@ -217,30 +242,25 @@ public:
     /// The two residues are the same (`first == second`), this function returns
     /// `true`.
     ///
-    /// @example{tests/doc/topology/are_linked.cpp}
+    /// @example{topology/are_linked.cpp}
     bool are_linked(const Residue& first, const Residue& second) const;
 
     /// Get the residue containing the atom at the given `index`.
     ///
     /// If no residue contains this atom, this function returns `nullopt`.
     ///
-    /// @verbatim embed:rst:leading-slashes
-    /// This function returna an :cpp:class:`chemfiles::optional` value that is
-    /// close to C++17 ``std::optional``.
-    /// @endverbatim
-    ///
-    /// @example{tests/doc/topology/residue_for_atom.cpp}
+    /// @example{topology/residue_for_atom.cpp}
     optional<const Residue&> residue_for_atom(size_t index) const;
 
     /// Get the residue at the given `index` in this topology
     ///
     /// There is no guarantee that this index matches the residue id.
     ///
-    /// @example{tests/doc/topology/residue.cpp}
+    /// @example{topology/residue.cpp}
     const Residue& residue(size_t index) const {
         if (index >= residues_.size()) {
             throw OutOfBounds(
-                "Residue index out of bounds in topology: we have "
+                "residue index out of bounds in topology: we have "
                 + std::to_string(residues_.size()) + " residues, "
                 + "but the index is " + std::to_string(index)
             );
@@ -250,15 +270,12 @@ public:
 
     /// Get all the residues in the topology as a vector
     ///
-    /// @example{tests/doc/topology/residues.cpp}
+    /// @example{topology/residues.cpp}
     const std::vector<Residue>& residues() const {
         return residues_;
     }
 
 private:
-    /// Check wether the atoms at indexes `i` and `j` are bonded or not
-    bool is_bond(size_t i, size_t j) const;
-
     /// Atoms in the system.
     std::vector<Atom> atoms_;
     /// Connectivity of the system.

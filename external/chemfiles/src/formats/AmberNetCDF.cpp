@@ -1,17 +1,47 @@
 // Chemfiles, a modern library for chemistry file reading and writing
 // Copyright (C) Guillaume Fraux and contributors -- BSD license
 
+#include <cassert>
+#include <array>
+#include <string>
+#include <vector>
+
+#include "chemfiles/types.hpp"
+#include "chemfiles/config.h"
+#include "chemfiles/warnings.hpp"
+#include "chemfiles/error_fmt.hpp"
+#include "chemfiles/external/span.hpp"
+#include "chemfiles/external/optional.hpp"
+
+
+#include "chemfiles/File.hpp"
+#include "chemfiles/Frame.hpp"
+#include "chemfiles/UnitCell.hpp"
+#include "chemfiles/FormatMetadata.hpp"
+
+#include "chemfiles/files/NcFile.hpp"
 #include "chemfiles/formats/AmberNetCDF.hpp"
 
-#include "chemfiles/ErrorFmt.hpp"
-#include "chemfiles/Frame.hpp"
-#include "chemfiles/warnings.hpp"
 using namespace chemfiles;
 
-template<> FormatInfo chemfiles::format_information<AmberNetCDFFormat>() {
-    return FormatInfo("Amber NetCDF").with_extension(".nc").description(
-        "Amber convention for binary NetCDF molecular trajectories"
-    );
+template<> const FormatMetadata& chemfiles::format_metadata<AmberNetCDFFormat>() {
+    static FormatMetadata metadata;
+    metadata.name = "Amber NetCDF";
+    metadata.extension = ".nc";
+    metadata.description = "Amber convention for binary NetCDF molecular trajectories";
+    metadata.reference = "http://ambermd.org/netcdf/nctraj.xhtml";
+
+    metadata.read = true;
+    metadata.write = true;
+    metadata.memory = false;
+
+    metadata.positions = true;
+    metadata.velocities = true;
+    metadata.unit_cell = true;
+    metadata.atoms = false;
+    metadata.bonds = false;
+    metadata.residues = false;
+    return metadata;
 }
 
 //! Check the validity of a NetCDF file
@@ -20,29 +50,32 @@ static bool is_valid(const NcFile& file_, size_t natoms) {
 
     if (file_.global_attribute("Conventions") != "AMBER") {
         if (!writing) {
-            warning("We can only read AMBER convention NetCDF files.");
+            warning("Amber NetCDF reader", "we can only read AMBER convention");
         }
         return false;
     }
 
     if (file_.global_attribute("ConventionVersion") != "1.0") {
         if (!writing) {
-            warning("We can only read version 1.0 of AMBER convention NetCDF files.");
+            warning("Amber NetCDF reader", "we can only read version 1.0 of AMBER convention");
         }
         return false;
     }
 
     if (file_.dimension("spatial") != 3) {
         if (!writing) {
-            warning("Wrong size for spatial dimension. Should be 3, is {}.", file_.dimension("spatial"));
+            warning("Amber NetCDF reader",
+                "wrong size for spatial dimension: should be 3, is {}",
+                file_.dimension("spatial")
+            );
         }
         return false;
     }
 
     if (writing) {
         if (file_.dimension("atom") != natoms) {
-            warning(
-                "Wrong size for atoms dimension. Should be {}, is {}.",
+            warning("Amber NetCDF writer",
+                "wrong size for atoms dimension: should be {}, is {}",
                 natoms, file_.dimension("atom")
             );
             return false;
@@ -51,18 +84,21 @@ static bool is_valid(const NcFile& file_, size_t natoms) {
     return true;
 }
 
-AmberNetCDFFormat::AmberNetCDFFormat(const std::string& path, File::Mode mode)
-    : file_(path, mode), step_(0), validated_(false) {
+AmberNetCDFFormat::AmberNetCDFFormat(std::string path, File::Mode mode, File::Compression compression)
+    : file_(std::move(path), mode), step_(0), validated_(false) {
     if (file_.mode() == File::READ || file_.mode() == File::APPEND) {
         if (!is_valid(file_, static_cast<size_t>(-1))) {
-            throw format_error("invalid AMBER NetCDF file at '{}'", file_.filename());
+            throw format_error("invalid AMBER NetCDF file at '{}'", file_.path());
         }
         validated_ = true;
+    }
+    if (compression != File::DEFAULT) {
+        throw format_error("compression is not supported with NetCDF format");
     }
 }
 
 size_t AmberNetCDFFormat::nsteps() {
-    return static_cast<size_t>(file_.dimension("frame"));
+    return file_.dimension("frame");
 }
 
 void AmberNetCDFFormat::read_step(const size_t step, Frame& frame) {
@@ -99,14 +135,29 @@ UnitCell AmberNetCDFFormat::read_cell() {
 
     std::vector<size_t> start{step_, 0};
     std::vector<size_t> count{1, 3};
+    auto lengths_f = length_var.get(start, count);
+    auto angles_f = angles_var.get(start, count);
 
-    auto length = length_var.get(start, count);
-    auto angles = angles_var.get(start, count);
+    auto lengths = Vector3D(
+        static_cast<double>(lengths_f[0]),
+        static_cast<double>(lengths_f[1]),
+        static_cast<double>(lengths_f[2])
+    );
+    auto angles = Vector3D(
+        static_cast<double>(angles_f[0]),
+        static_cast<double>(angles_f[1]),
+        static_cast<double>(angles_f[2])
+    );
 
-    assert(length.size() == 3);
-    assert(angles.size() == 3);
+    if (length_var.attribute_exists("scale_factor")) {
+        lengths *= static_cast<double>(length_var.float_attribute("scale_factor"));
+    }
 
-    return {length[0], length[1], length[2], angles[0], angles[1], angles[2]};
+    if (angles_var.attribute_exists("scale_factor")) {
+        angles *= static_cast<double>(angles_var.float_attribute("scale_factor"));
+    }
+
+    return UnitCell(lengths, angles);
 }
 
 void AmberNetCDFFormat::read_array(span<Vector3D> array, const std::string& name) {
@@ -118,10 +169,17 @@ void AmberNetCDFFormat::read_array(span<Vector3D> array, const std::string& name
     std::vector<size_t> count{1, natoms, 3};
     auto data = array_var.get(start, count);
 
+    if (array_var.attribute_exists("scale_factor")) {
+        float scale_factor = array_var.float_attribute("scale_factor");
+        for (auto& value : data) {
+            value *= scale_factor;
+        }
+    }
+
     for (size_t i = 0; i < natoms; i++) {
-        array[i][0] = data[3 * i + 0];
-        array[i][1] = data[3 * i + 1];
-        array[i][2] = data[3 * i + 2];
+        array[i][0] = static_cast<double>(data[3 * i + 0]);
+        array[i][1] = static_cast<double>(data[3 * i + 1]);
+        array[i][2] = static_cast<double>(data[3 * i + 2]);
     }
 }
 
@@ -148,20 +206,20 @@ static void initialize(NcFile& file, size_t natoms, bool with_velocities) {
 
     auto coordinates =
         file.add_variable<nc::NcFloat>("coordinates", "frame", "atom", "spatial");
-    coordinates.add_attribute("units", "angstrom");
+    coordinates.add_string_attribute("units", "angstrom");
 
-    auto cell_lenght =
+    auto cell_length =
         file.add_variable<nc::NcFloat>("cell_lengths", "frame", "cell_spatial");
-    cell_lenght.add_attribute("units", "angstrom");
+    cell_length.add_string_attribute("units", "angstrom");
 
     auto cell_angles =
         file.add_variable<nc::NcFloat>("cell_angles", "frame", "cell_angular");
-    cell_angles.add_attribute("units", "degree");
+    cell_angles.add_string_attribute("units", "degree");
 
     if (with_velocities) {
         auto velocities =
             file.add_variable<nc::NcFloat>("velocities", "frame", "atom", "spatial");
-        velocities.add_attribute("units", "angstrom/picosecond");
+        velocities.add_string_attribute("units", "angstrom/picosecond");
     }
     file.set_nc_mode(NcFile::DATA);
 
@@ -207,13 +265,16 @@ void AmberNetCDFFormat::write_cell(const UnitCell& cell) {
     auto length = file_.variable<nc::NcFloat>("cell_lengths");
     auto angles = file_.variable<nc::NcFloat>("cell_angles");
 
-    auto length_data = std::vector<float>{static_cast<float>(cell.a()),
-                                          static_cast<float>(cell.b()),
-                                          static_cast<float>(cell.c())};
+    auto cell_lengths = cell.lengths();
+    auto cell_angles = cell.angles();
 
-    auto angles_data = std::vector<float>{static_cast<float>(cell.alpha()),
-                                          static_cast<float>(cell.beta()),
-                                          static_cast<float>(cell.gamma())};
+    auto length_data = std::vector<float>{static_cast<float>(cell_lengths[0]),
+                                          static_cast<float>(cell_lengths[1]),
+                                          static_cast<float>(cell_lengths[2])};
+
+    auto angles_data = std::vector<float>{static_cast<float>(cell_angles[0]),
+                                          static_cast<float>(cell_angles[1]),
+                                          static_cast<float>(cell_angles[2])};
 
     std::vector<size_t> start{step_, 0};
     std::vector<size_t> count{1, 3};

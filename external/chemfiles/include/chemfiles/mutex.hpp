@@ -10,7 +10,7 @@ namespace chemfiles {
 
 template<class T> class mutex;
 
-/// A lock guard that guarantee exlusive access to the underlying data.
+/// A lock guard that guarantee exclusive access to the underlying data.
 ///
 /// When the lock guard is destroyed, it releases the associated mutex.
 template<class T>
@@ -54,8 +54,8 @@ public:
 
     mutex(const mutex&) = delete;
     mutex& operator=(const mutex&) = delete;
-    mutex(mutex&&) = default;
-    mutex& operator=(mutex&&) = default;
+    mutex(mutex&&) = delete;
+    mutex& operator=(mutex&&) = delete;
 
     ~mutex() {
         // deadlock if someone is trying to destroy this `chemfiles::mutex`

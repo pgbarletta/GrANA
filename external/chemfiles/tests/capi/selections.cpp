@@ -9,6 +9,37 @@ static CHFL_FRAME* testing_frame(void);
 static bool find_match(const chfl_match matches[], uint64_t n, chfl_match match);
 
 TEST_CASE("chfl_selection") {
+    SECTION("Constructors errors") {
+        fail_next_allocation();
+        CHECK(chfl_selection("all") == nullptr);
+
+        CHFL_SELECTION* selection = chfl_selection("all");
+        REQUIRE(selection);
+
+        fail_next_allocation();
+        CHECK(chfl_selection_copy(selection) == nullptr);
+
+        chfl_free(selection);
+    }
+
+    SECTION("copy") {
+        CHFL_SELECTION* selection = chfl_selection("name O");
+        REQUIRE(selection);
+
+        CHFL_SELECTION* copy = chfl_selection_copy(selection);
+        REQUIRE(copy);
+
+        char buffer[32] = {0};
+        CHECK_STATUS(chfl_selection_string(selection, buffer, sizeof(buffer)));
+        CHECK(buffer == std::string("name O"));
+
+        CHECK_STATUS(chfl_selection_string(copy, buffer, sizeof(buffer)));
+        CHECK(buffer == std::string("name O"));
+
+        chfl_free(copy);
+        chfl_free(selection);
+    }
+
     SECTION("Selection string") {
         CHFL_SELECTION* selection = chfl_selection("name O");
         REQUIRE(selection);
@@ -17,7 +48,7 @@ TEST_CASE("chfl_selection") {
         CHECK_STATUS(chfl_selection_string(selection, buffer, sizeof(buffer)));
         CHECK(buffer == std::string("name O"));
 
-        CHECK_STATUS(chfl_selection_free(selection));
+        chfl_free(selection);
 
         selection = chfl_selection("angles: all");
         REQUIRE(selection);
@@ -25,7 +56,7 @@ TEST_CASE("chfl_selection") {
         CHECK_STATUS(chfl_selection_string(selection, buffer, sizeof(buffer)));
         CHECK(buffer == std::string("angles: all"));
 
-        CHECK_STATUS(chfl_selection_free(selection));
+        chfl_free(selection);
     }
 
     SECTION("Size") {
@@ -36,7 +67,7 @@ TEST_CASE("chfl_selection") {
         CHECK_STATUS(chfl_selection_size(selection, &size));
         CHECK(size == 1);
 
-        CHECK_STATUS(chfl_selection_free(selection));
+        chfl_free(selection);
 
         selection = chfl_selection("angles: all");
         REQUIRE(selection);
@@ -44,7 +75,7 @@ TEST_CASE("chfl_selection") {
         CHECK_STATUS(chfl_selection_size(selection, &size));
         CHECK(size == 3);
 
-        CHECK_STATUS(chfl_selection_free(selection));
+        chfl_free(selection);
     }
 
     SECTION("Evaluate") {
@@ -59,7 +90,7 @@ TEST_CASE("chfl_selection") {
         CHECK(matches_count == 2);
 
         chfl_match* matches = new chfl_match[static_cast<size_t>(matches_count)];
-        REQUIRE(matches != 0);
+        REQUIRE(matches);
 
         CHECK(chfl_selection_matches(selection, matches, 1) == CHFL_MEMORY_ERROR);
 
@@ -73,7 +104,7 @@ TEST_CASE("chfl_selection") {
         CHECK(matches[1].atoms[3] == static_cast<uint64_t>(-1));
         delete[] matches;
 
-        CHECK_STATUS(chfl_selection_free(selection));
+        chfl_free(selection);
 
         selection = chfl_selection("angles: all");
         REQUIRE(selection);
@@ -93,8 +124,8 @@ TEST_CASE("chfl_selection") {
         CHECK(find_match(matches, matches_count, match_2));
         delete[] matches;
 
-        CHECK_STATUS(chfl_selection_free(selection));
-        CHECK_STATUS(chfl_frame_free(frame));
+        chfl_free(selection);
+        chfl_free(frame);
     }
 }
 
@@ -110,8 +141,8 @@ static CHFL_FRAME* testing_frame(void) {
     CHECK_STATUS(chfl_topology_add_atom(topology, O));
     CHECK_STATUS(chfl_topology_add_atom(topology, O));
     CHECK_STATUS(chfl_topology_add_atom(topology, H));
-    CHECK_STATUS(chfl_atom_free(O));
-    CHECK_STATUS(chfl_atom_free(H));
+    chfl_free(O);
+    chfl_free(H);
 
     CHECK_STATUS(chfl_topology_add_bond(topology, 0, 1));
     CHECK_STATUS(chfl_topology_add_bond(topology, 1, 2));
@@ -121,7 +152,7 @@ static CHFL_FRAME* testing_frame(void) {
     REQUIRE(frame);
     CHECK_STATUS(chfl_frame_resize(frame, 4));
     CHECK_STATUS(chfl_frame_set_topology(frame, topology));
-    CHECK_STATUS(chfl_topology_free(topology));
+    chfl_free(topology);
     return frame;
 }
 

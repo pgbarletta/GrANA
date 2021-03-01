@@ -1,27 +1,88 @@
 // Chemfiles, a modern library for chemistry file reading and writing
 // Copyright (C) Guillaume Fraux and contributors -- BSD license
 
+#include <cassert>
+#include <functional>
+#include <memory>
+#include <string>
+
 #include "chemfiles/Trajectory.hpp"
+
+#include "chemfiles/Atom.hpp"
 #include "chemfiles/File.hpp"
 #include "chemfiles/Format.hpp"
-#include "chemfiles/ErrorFmt.hpp"
-#include "chemfiles/Configuration.hpp"
+#include "chemfiles/Frame.hpp"
+#include "chemfiles/UnitCell.hpp"
+#include "chemfiles/Topology.hpp"
 #include "chemfiles/FormatFactory.hpp"
+#include "chemfiles/Configuration.hpp"
+#include "chemfiles/files/MemoryBuffer.hpp"
+
+#include "chemfiles/utils.hpp"
+#include "chemfiles/error_fmt.hpp"
+#include "chemfiles/string_view.hpp"
+#include "chemfiles/external/span.hpp"
+#include "chemfiles/external/optional.hpp"
 
 using namespace chemfiles;
 
-//! Get the extension part of a filename.
-static std::string extension(const std::string& filename) {
-    auto idx = filename.rfind('.');
+#define SENTINEL_VALUE (static_cast<size_t>(-1))
 
-    if (idx != std::string::npos) {
-        return filename.substr(idx);
-    } else {
-        throw file_error(
-            "file at '{}' does not have an extension, provide a format name to read it",
-            filename
-        );
+struct file_open_info {
+    static file_open_info parse(const std::string& path, const std::string& format);
+    std::string format = "";
+    std::string extension = "";
+    File::Compression compression = File::DEFAULT;
+};
+
+file_open_info file_open_info::parse(const std::string& path, const std::string& format) {
+    file_open_info info;
+
+    auto slash = format.find('/');
+    if (slash != std::string::npos) {
+        auto tmp = format.substr(slash + 1);
+        auto compression = trim(tmp);
+        if (compression == "GZ") {
+            info.compression = File::GZIP;
+        } else if (compression == "BZ2") {
+            info.compression = File::BZIP2;
+        } else if (compression == "XZ") {
+            info.compression = File::LZMA;
+        } else {
+            throw file_error("unknown compression method '{}'", compression);
+        }
     }
+
+    auto tmp = format.substr(0, slash);
+    info.format = trim(tmp).to_string();
+
+    auto dot1 = path.rfind('.');
+    if (dot1 != std::string::npos) {
+        info.extension = path.substr(dot1);
+        if (info.compression == File::DEFAULT) {
+            bool new_extension = false;
+            // check file extension for compressed file extension
+            if (info.extension == ".gz") {
+                new_extension = true;
+                info.compression = File::GZIP;
+            } else if (info.extension == ".bz2") {
+                new_extension = true;
+                info.compression = File::BZIP2;
+            } else if (info.extension == ".xz") {
+                new_extension = true;
+                info.compression = File::LZMA;
+            }
+
+            if (new_extension) {
+                auto dot2 = path.substr(0, dot1).rfind('.');
+                if (dot2 != std::string::npos) {
+                    info.extension = path.substr(0, dot1).substr(dot2);
+                }
+            }
+        }
+    }
+
+    return info;
 }
 
 static File::Mode char_to_file_mode(char mode) {
@@ -41,17 +102,60 @@ static File::Mode char_to_file_mode(char mode) {
 }
 
 Trajectory::Trajectory(std::string path, char mode, const std::string& format)
-    : path_(std::move(path)), mode_(mode), step_(0), nsteps_(0), format_(nullptr) {
+    : path_(std::move(path)), mode_(mode), format_(nullptr) {
+
+    auto info = file_open_info::parse(path_, format);
     format_creator_t format_creator;
-    if (format == "") {
-        format_creator = FormatFactory::get().extension(extension(path_));
+    if (!info.format.empty()) {
+        format_creator = FormatFactory::get().name(info.format);
+    } else if (!info.extension.empty()) {
+        format_creator = FormatFactory::get().extension(info.extension);
     } else {
-        format_creator = FormatFactory::get().name(format);
+        throw file_error(
+            "file at '{}' does not have an extension, provide a format name to read it",
+            path_
+        );
     }
 
-    auto filemode = char_to_file_mode(mode);
-    format_ = format_creator(path_, filemode);
+    format_ = format_creator(path_, char_to_file_mode(mode), info.compression);
 
+    if (mode == 'r' || mode == 'a') {
+        nsteps_ = format_->nsteps();
+    }
+}
+
+Trajectory Trajectory::memory_reader(const char* data, size_t size, const std::string& format) {
+
+    auto info = file_open_info::parse("", format);
+
+    if (info.format == "") {
+        throw format_error("format name '{}' is invalid", format);
+    }
+
+    auto memory_creator = FormatFactory::get().memory_stream(info.format);
+    auto buffer = std::make_shared<MemoryBuffer>(data, size);
+    auto creator = memory_creator(buffer, File::READ, info.compression);
+
+    return Trajectory('r', std::move(creator), std::move(buffer));
+}
+
+Trajectory Trajectory::memory_writer(const std::string& format) {
+    auto info = file_open_info::parse("", format);
+
+    if (info.format == "") {
+        throw format_error("format name '{}' is invalid", format);
+    }
+
+    auto memory_creator = FormatFactory::get().memory_stream(info.format);
+    auto buffer = std::make_shared<MemoryBuffer>(8192);
+
+    auto format_ = memory_creator(buffer, File::WRITE, info.compression);
+
+    return Trajectory('w', std::move(format_), std::move(buffer));
+}
+
+Trajectory::Trajectory(char mode, std::unique_ptr<Format> format, std::shared_ptr<MemoryBuffer> buffer)
+    : mode_(mode), format_(std::move(format)), buffer_(std::move(buffer)) {
     if (mode == 'r' || mode == 'a') {
         nsteps_ = format_->nsteps();
     }
@@ -63,21 +167,26 @@ Trajectory& Trajectory::operator=(Trajectory&&) = default;
 
 void Trajectory::pre_read(size_t step) {
     if (step >= nsteps_) {
-        throw file_error(
-            "can not read file '{}' at step {}: maximal step is {}",
-            path_, step, nsteps_
-        );
+        if (nsteps_ == 0) {
+            throw file_error(
+                "can not read file '{}' at step {}, it does not contain any step",
+                path_, step
+            );
+        } else {
+            throw file_error(
+                "can not read file '{}' at step {}: maximal step is {}",
+                path_, step, nsteps_ - 1
+            );
+        }
     }
-    if (!(mode_ == File::READ || mode_ == File::APPEND)) {
+    if (mode_ != File::READ) {
         throw file_error(
-            "the file at '{}' was not openened in read or append mode", path_
+            "the file at '{}' was not opened in read mode", path_
         );
     }
 }
 
 void Trajectory::post_read(Frame& frame) {
-    frame.set_step(step_);
-
     if (custom_topology_) {
         frame.set_topology(*custom_topology_);
     } else {
@@ -106,8 +215,14 @@ Frame Trajectory::read() {
     pre_read(step_);
 
     Frame frame;
+    frame.set_step(SENTINEL_VALUE);
     format_->read(frame);
     post_read(frame);
+
+    // Don't override the step set by a format
+    if (frame.step() == SENTINEL_VALUE) {
+        frame.set_step(step_);
+    }
 
     step_++;
     return frame;
@@ -118,8 +233,14 @@ Frame Trajectory::read_step(const size_t step) {
     pre_read(step);
 
     Frame frame;
+    frame.set_step(SENTINEL_VALUE);
     step_ = step;
     format_->read_step(step_, frame);
+
+    // Don't override the step set by a format
+    if (frame.step() == SENTINEL_VALUE) {
+        frame.set_step(step_);
+    }
 
     post_read(frame);
     return frame;
@@ -129,7 +250,7 @@ void Trajectory::write(const Frame& frame) {
     check_opened();
     if (!(mode_ == File::WRITE || mode_ == File::APPEND)) {
         throw file_error(
-            "the file at '{}' was not openened in write or append mode", path_
+            "the file at '{}' was not opened in write or append mode", path_
         );
     }
 
@@ -157,10 +278,10 @@ void Trajectory::set_topology(const Topology& topology) {
 
 void Trajectory::set_topology(const std::string& filename, const std::string& format) {
     check_opened();
-    Trajectory topolgy_file(filename, 'r', format);
-    assert(topolgy_file.nsteps() > 0);
+    Trajectory topology_file(filename, 'r', format);
+    assert(topology_file.nsteps() > 0);
 
-    auto frame = topolgy_file.read_step(0);
+    auto frame = topology_file.read_step(0);
     set_topology(frame.topology());
 }
 
@@ -178,4 +299,12 @@ void Trajectory::close() {
     check_opened();
     // delete the format and set the pointer to nullptr
     format_.reset();
+}
+
+optional<span<const char>> Trajectory::memory_buffer() const {
+    if (buffer_ == nullptr || mode_ == File::READ) {
+        return nullopt;
+    }
+
+    return span<const char>(buffer_->data(), buffer_->data() + buffer_->size());
 }

@@ -8,7 +8,7 @@
 using namespace chemfiles;
 
 
-TEST_CASE("Read a NetCDF file"){
+TEST_CASE("Read a NetCDF file") {
     NcFile file("data/netcdf/water.nc", File::READ);
 
     CHECK(file.global_attribute("Conventions") == "AMBER");
@@ -17,7 +17,7 @@ TEST_CASE("Read a NetCDF file"){
     // Unlimited dimension
     CHECK(file.dimension("frame") == 100);
 
-    CHECK(file.variable<nc::NcFloat>("cell_lengths").attribute("units") == "Angstrom");
+    CHECK(file.variable<nc::NcFloat>("cell_lengths").string_attribute("units") == "Angstrom");
 
     auto var = file.variable<nc::NcFloat>("coordinates");
     auto dims = var.dimmensions();
@@ -26,23 +26,23 @@ TEST_CASE("Read a NetCDF file"){
     CHECK(dims[1] == 297);
     CHECK(dims[2] == 3);
 
-    auto EPS = 1e-5;
+    auto EPS = 1e-5f;
     auto positions = var.get({0, 0, 0}, {1, 297, 3});
-    CHECK(fabs(positions[0] - 0.4172191) < EPS);
-    CHECK(fabs(positions[1] - 8.303366) < EPS);
-    CHECK(fabs(positions[2] - 11.73717) < EPS);
+    CHECK(std::abs(positions[0] - 0.4172191f) < EPS);
+    CHECK(std::abs(positions[1] - 8.303366f) < EPS);
+    CHECK(std::abs(positions[2] - 11.73717f) < EPS);
 }
 
-TEST_CASE("Errors in NetCDF files"){
+TEST_CASE("Errors in NetCDF files") {
     NcFile file("data/netcdf/water.nc", File::READ);
 
     CHECK_THROWS_AS(file.global_attribute("FOO"), FileError);
     CHECK_THROWS_AS(file.dimension("FOO"), FileError);
-    CHECK_THROWS_AS(file.variable<nc::NcFloat>("cell_lengths").attribute("Bar"), FileError);
+    CHECK_THROWS_AS(file.variable<nc::NcFloat>("cell_lengths").string_attribute("Bar"), FileError);
     CHECK_THROWS_AS(file.variable<nc::NcFloat>("FOO"), FileError);
 }
 
-TEST_CASE("Write NetCDF files"){
+TEST_CASE("Write NetCDF files") {
     auto tmpfile = NamedTempPath(".nc");
 
     {
@@ -52,16 +52,28 @@ TEST_CASE("Write NetCDF files"){
         file.add_dimension("infinite");
         file.add_dimension("finite", 42);
         auto variable = file.add_variable<nc::NcFloat>("variable", "infinite", "finite");
-        variable.add_attribute("attribute", "hello");
+        variable.add_string_attribute("attribute", "hello");
+
+        file.set_nc_mode(NcFile::DATA);
+        variable.add({0, 0}, {1, 42}, std::vector<float>(42, 38.2f));
+    }
+
+    {
+        NcFile file(tmpfile, File::APPEND);
+        auto variable = file.variable<nc::NcFloat>("variable");
+        variable.add({1, 0}, {1, 42}, std::vector<float>(42, 55.1f));
     }
 
     {
         NcFile file(tmpfile, File::READ);
         CHECK(file.global_attribute("global") == "global.value");
-        CHECK(file.dimension("infinite") == 0);
+        CHECK(file.dimension("infinite") == 2);
         CHECK(file.dimension("finite") == 42);
         CHECK(file.variable_exists("variable"));
         CHECK_FALSE(file.variable_exists("bar"));
-        CHECK(file.variable<nc::NcFloat>("variable").attribute("attribute") == "hello");
+        auto variable = file.variable<nc::NcFloat>("variable");
+        CHECK(variable.string_attribute("attribute") == "hello");
+        CHECK(variable.get({0, 0}, {1, 42}) == std::vector<float>(42, 38.2f));
+        CHECK(variable.get({1, 0}, {1, 42}) == std::vector<float>(42, 55.1f));
     }
 }

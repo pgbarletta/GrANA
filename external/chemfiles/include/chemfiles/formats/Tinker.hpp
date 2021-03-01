@@ -4,10 +4,18 @@
 #ifndef CHEMFILES_FORMAT_TINKER_HPP
 #define CHEMFILES_FORMAT_TINKER_HPP
 
-#include "chemfiles/Format.hpp"
+#include <cstdint>
+#include <string>
+#include <memory>
+
 #include "chemfiles/File.hpp"
+#include "chemfiles/Format.hpp"
+#include "chemfiles/external/optional.hpp"
 
 namespace chemfiles {
+class Frame;
+class MemoryBuffer;
+class FormatMetadata;
 
 /// Tinker XYZ file format.
 ///
@@ -17,23 +25,19 @@ namespace chemfiles {
 ///
 /// This format is associated with the .arc extension, but not the .xyz
 /// extension, which is used for the standard XYZ format.
-class TinkerFormat final: public Format {
+class TinkerFormat final: public TextFormat {
 public:
-    TinkerFormat(const std::string& path, File::Mode mode);
+    TinkerFormat(std::string path, File::Mode mode, File::Compression compression):
+        TextFormat(std::move(path), mode, compression) {}
+    TinkerFormat(std::shared_ptr<MemoryBuffer> memory, File::Mode mode, File::Compression compression) :
+        TextFormat(std::move(memory), mode, compression) {}
 
-    void read_step(size_t step, Frame& frame) override;
-    void read(Frame& frame) override;
-    void write(const Frame& frame) override;
-    size_t nsteps() override;
-private:
-    /// Text file where we read from
-    std::unique_ptr<TextFile> file_;
-    /// Storing the positions of all the steps in the file, so that we can
-    /// just `seekg` them instead of reading the whole step.
-    std::vector<std::streampos> steps_positions_;
+    void read_next(Frame& frame) override;
+    void write_next(const Frame& frame) override;
+    optional<uint64_t> forward() override;
 };
 
-template<> FormatInfo format_information<TinkerFormat>();
+template<> const FormatMetadata& format_metadata<TinkerFormat>();
 
 } // namespace chemfiles
 

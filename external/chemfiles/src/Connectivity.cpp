@@ -1,12 +1,19 @@
 // Chemfiles, a modern library for chemistry file reading and writing
 // Copyright (C) Guillaume Fraux and contributors -- BSD license
 
+#include <cassert>
+#include <array>
+#include <vector>
+#include <iterator>
+#include <algorithm>
+
 #include "chemfiles/Connectivity.hpp"
-#include "chemfiles/ErrorFmt.hpp"
+#include "chemfiles/error_fmt.hpp"
+#include "chemfiles/sorted_set.hpp"
 
 using namespace chemfiles;
 
-Bond::Bond(size_t i, size_t j) {
+Bond::Bond(size_t i, size_t j): data_({{0}}) {
     if (i == j) {
         throw error("can not have a bond between an atom and itself");
     }
@@ -22,7 +29,7 @@ size_t Bond::operator[](size_t i) const {
     return data_[i];
 }
 
-Angle::Angle(size_t i, size_t j, size_t k) {
+Angle::Angle(size_t i, size_t j, size_t k): data_({{0}}) {
     if (i == j || i == k || j == k) {
         throw error("can not have the same atom twice in an angle");
     }
@@ -39,7 +46,7 @@ size_t Angle::operator[](size_t i) const {
     return data_[i];
 }
 
-Dihedral::Dihedral(size_t i, size_t j, size_t k, size_t m) {
+Dihedral::Dihedral(size_t i, size_t j, size_t k, size_t m): data_({{0}}) {
     if (i == j || j == k || k == m) {
         throw error("can not have an atom linked to itself in a dihedral angle");
     }
@@ -68,7 +75,7 @@ size_t Dihedral::operator[](size_t i) const {
     return data_[i];
 }
 
-Improper::Improper(size_t i, size_t j, size_t k, size_t m) {
+Improper::Improper(size_t i, size_t j, size_t k, size_t m): data_({{0}}) {
     if (j == i || j == k || j == m) {
         throw error("can not have an atom linked to itself in an improper dihedral angle");
     }
@@ -151,10 +158,11 @@ void Connectivity::recalculate() const {
 }
 
 const sorted_set<Bond>& Connectivity::bonds() const {
-    if (!uptodate_) {
-        recalculate();
-    }
     return bonds_;
+}
+
+const std::vector<Bond::BondOrder>& Connectivity::bond_orders() const {
+    return bond_orders_;
 }
 
 const sorted_set<Angle>& Connectivity::angles() const {
@@ -178,25 +186,39 @@ const sorted_set<Improper>& Connectivity::impropers() const {
     return impropers_;
 }
 
-void Connectivity::add_bond(size_t i, size_t j) {
+void Connectivity::add_bond(size_t i, size_t j, Bond::BondOrder bond_order) {
     uptodate_ = false;
-    bonds_.emplace(i, j);
+    auto result = bonds_.emplace(i, j);
     if (i > biggest_atom_) {biggest_atom_ = i;}
     if (j > biggest_atom_) {biggest_atom_ = j;}
+
+    if (result.second) {
+        auto diff = std::distance(bonds_.cbegin(), result.first);
+        bond_orders_.insert(bond_orders_.begin() + diff, bond_order);
+    }
 }
 
 void Connectivity::remove_bond(size_t i, size_t j) {
     auto pos = bonds_.find(Bond(i, j));
     if (pos != bonds_.end()) {
         uptodate_ = false;
-        bonds_.erase(pos);
+        auto result = bonds_.erase(pos);
+
+        auto diff = std::distance(bonds_.cbegin(), result);
+        bond_orders_.erase(bond_orders_.begin() + diff);
+        assert(bond_orders_.size() == bonds_.size());
     }
 }
 
 void Connectivity::atom_removed(size_t index) {
     auto to_remove = std::vector<Bond>();
     auto to_add = std::vector<Bond>();
-    for (auto& bond: bonds_) {
+    auto bo_add = std::vector<Bond::BondOrder>();
+
+    const auto& bonds = bonds_.as_vec();
+    for (size_t idx = 0; idx < bonds_.size(); idx++) {
+        const auto& bond = bonds[idx];
+
         if (bond[0] == index || bond[1] == index) {
             throw error("can not shift atomic indexes that still have a bond");
         }
@@ -206,6 +228,7 @@ void Connectivity::atom_removed(size_t index) {
             auto i = bond[0] > index ? bond[0] - 1 : bond[0];
             auto j = bond[1] > index ? bond[1] - 1 : bond[1];
             to_add.emplace_back(i, j);
+            bo_add.push_back(bond_orders_[idx]);
         }
     }
 
@@ -213,7 +236,22 @@ void Connectivity::atom_removed(size_t index) {
         this->remove_bond(bond[0], bond[1]);
     }
 
-    for (auto bond: to_add) {
-        this->add_bond(bond[0], bond[1]);
+    for (size_t idx = 0; idx < to_add.size(); idx++) {
+        const auto& bond = to_add[idx];
+        this->add_bond(bond[0], bond[1], bo_add[idx]);
     }
+}
+
+Bond::BondOrder Connectivity::bond_order(size_t i, size_t j) const {
+    auto pos = bonds_.find(Bond(i, j));
+    if (pos != bonds_.end()) {
+        auto diff = std::distance(bonds_.cbegin(), pos);
+        return bond_orders_[static_cast<size_t>(diff)];
+    }
+
+    throw error(
+        "out of bounds atomic index in `Connectivity::bond_order`: "
+        "No bond between {} and {} exists",
+        i, j
+    );
 }

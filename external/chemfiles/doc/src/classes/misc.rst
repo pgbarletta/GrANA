@@ -1,5 +1,5 @@
-Miscelaneous classes and functions
-==================================
+Miscelaneous
+============
 
 Basic types
 -----------
@@ -12,6 +12,14 @@ Basic types
 .. doxygenfunction:: chemfiles::cross
 
 .. doxygenclass:: chemfiles::Matrix3D
+    :members:
+
+Format list and Metadata
+------------------------
+
+.. doxygenfunction:: chemfiles::formats_list
+
+.. doxygenclass:: chemfiles::FormatMetadata
     :members:
 
 Errors handling
@@ -41,11 +49,11 @@ any pertinent way.
         return 0;
     }
 
-Any exceptions thown by chemfiles will derive from ``chemfiles::Error``.
-Catching  ``chemfiles::Error`` will then catch any exception thown by chemfiles.
-You also can catch any other error if you need finer grain control.
+Any exceptions thrown by chemfiles will derive from ``chemfiles::Error``.
+Catching  ``chemfiles::Error`` will then catch any exception thrown by
+chemfiles. You also can catch any other error if you need finer grain control.
 ``chemfiles::Error`` derives from ``std::runtime_error``, so it should play
-nicely with any exisiting C++ error handling.
+nicely with any existing C++ error handling.
 
 .. doxygenstruct:: chemfiles::Error
     :members:
@@ -82,7 +90,7 @@ each warning event.
 
 .. doxygenfunction:: chemfiles::set_warning_callback
 
-.. doxygentypedef:: chemfiles::warning_callback
+.. doxygentypedef:: chemfiles::warning_callback_t
 
 Configuration files
 -------------------

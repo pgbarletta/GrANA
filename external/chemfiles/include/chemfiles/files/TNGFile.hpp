@@ -4,7 +4,10 @@
 #ifndef CHEMFILES_TNG_FILE_HPP
 #define CHEMFILES_TNG_FILE_HPP
 
-#include "tng/tng_io.h"
+#include <string>
+
+#include <tng/tng_io.h>
+
 #include "chemfiles/File.hpp"
 
 namespace chemfiles {
@@ -13,10 +16,10 @@ namespace chemfiles {
 /// destruction of the file as needed.
 class TNGFile final: public File {
 public:
-    TNGFile(std::string filename, File::Mode mode);
-    ~TNGFile() noexcept override;
-    TNGFile(TNGFile&&) = default;
-    TNGFile& operator=(TNGFile&&) = delete;
+    TNGFile(std::string path, File::Mode mode);
+    ~TNGFile() override;
+    TNGFile(TNGFile&&) noexcept = default;
+    TNGFile& operator=(TNGFile&&) = default;
     TNGFile(TNGFile const&) = delete;
     TNGFile& operator=(TNGFile const&) = delete;
 

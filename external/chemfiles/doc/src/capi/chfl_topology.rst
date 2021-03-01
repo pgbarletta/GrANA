@@ -1,9 +1,40 @@
 .. _capi-topology:
 
-Function manipulating ``CHFL_TOPOLOGY``
----------------------------------------
+``CHFL_TOPOLOGY``
+-----------------
 
 .. doxygentypedef:: CHFL_TOPOLOGY
+
+.. only:: html
+
+    Here is the full list of functions acting on :cpp:type:`CHFL_TOPOLOGY`:
+
+    - :cpp:func:`chfl_topology`
+    - :cpp:func:`chfl_topology_from_frame`
+    - :cpp:func:`chfl_topology_copy`
+    - :cpp:func:`chfl_topology_atoms_count`
+    - :cpp:func:`chfl_topology_resize`
+    - :cpp:func:`chfl_topology_add_atom`
+    - :cpp:func:`chfl_topology_remove`
+    - :cpp:func:`chfl_topology_add_bond`
+    - :cpp:func:`chfl_topology_remove_bond`
+    - :cpp:func:`chfl_topology_clear_bonds`
+    - :cpp:func:`chfl_topology_bonds_count`
+    - :cpp:func:`chfl_topology_angles_count`
+    - :cpp:func:`chfl_topology_dihedrals_count`
+    - :cpp:func:`chfl_topology_impropers_count`
+    - :cpp:func:`chfl_topology_bonds`
+    - :cpp:func:`chfl_topology_angles`
+    - :cpp:func:`chfl_topology_dihedrals`
+    - :cpp:func:`chfl_topology_impropers`
+    - :cpp:func:`chfl_topology_add_residue`
+    - :cpp:func:`chfl_topology_residues_count`
+    - :cpp:func:`chfl_topology_residues_linked`
+    - :cpp:func:`chfl_topology_bond_with_order`
+    - :cpp:func:`chfl_topology_bond_orders`
+    - :cpp:func:`chfl_topology_bond_order`
+
+    --------------------------------------------------------------------
 
 .. doxygenfunction:: chfl_topology
 
@@ -22,6 +53,8 @@ Function manipulating ``CHFL_TOPOLOGY``
 .. doxygenfunction:: chfl_topology_add_bond
 
 .. doxygenfunction:: chfl_topology_remove_bond
+
+.. doxygenfunction:: chfl_topology_clear_bonds
 
 .. doxygenfunction:: chfl_topology_bonds_count
 
@@ -45,4 +78,8 @@ Function manipulating ``CHFL_TOPOLOGY``
 
 .. doxygenfunction:: chfl_topology_residues_linked
 
-.. doxygenfunction:: chfl_topology_free
+.. doxygenfunction:: chfl_topology_bond_with_order
+
+.. doxygenfunction:: chfl_topology_bond_orders
+
+.. doxygenfunction:: chfl_topology_bond_order

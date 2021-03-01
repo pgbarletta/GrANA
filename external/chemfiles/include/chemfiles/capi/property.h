@@ -4,12 +4,17 @@
 #ifndef CHEMFILES_CHFL_PROPERTY_H
 #define CHEMFILES_CHFL_PROPERTY_H
 
+#include <stdint.h>
+#include <stdbool.h>  // IWYU pragma: keep
+
 #include "chemfiles/capi/types.h"
+#include "chemfiles/exports.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/// Possible values holded by a CHFL_PROPERTY
+/// Possible values held by a CHFL_PROPERTY
 typedef enum {  // NOLINT: this is both a C and C++ file
     /// Bool value
     CHFL_PROPERTY_BOOL = 0,
@@ -24,9 +29,9 @@ typedef enum {  // NOLINT: this is both a C and C++ file
 /// Create a new property holding a boolean `value`.
 ///
 /// The caller of this function should free the allocated memory using
-/// `chfl_property_free`.
+/// `chfl_free`.
 ///
-/// @example{tests/capi/doc/chfl_property/bool.c}
+/// @example{capi/chfl_property/bool.c}
 /// @return A pointer to the property, or NULL in case of error. You can use
 ///         `chfl_last_error` to learn about the error.
 CHFL_EXPORT CHFL_PROPERTY* chfl_property_bool(bool value);
@@ -34,9 +39,9 @@ CHFL_EXPORT CHFL_PROPERTY* chfl_property_bool(bool value);
 /// Create a new property holding a double `value`.
 ///
 /// The caller of this function should free the allocated memory using
-/// `chfl_property_free`.
+/// `chfl_free`.
 ///
-/// @example{tests/capi/doc/chfl_property/double.c}
+/// @example{capi/chfl_property/double.c}
 /// @return A pointer to the property, or NULL in case of error. You can use
 ///         `chfl_last_error` to learn about the error.
 CHFL_EXPORT CHFL_PROPERTY* chfl_property_double(double value);
@@ -44,9 +49,9 @@ CHFL_EXPORT CHFL_PROPERTY* chfl_property_double(double value);
 /// Create a new property holding a string `value`.
 ///
 /// The caller of this function should free the allocated memory using
-/// `chfl_property_free`.
+/// `chfl_free`.
 ///
-/// @example{tests/capi/doc/chfl_property/string.c}
+/// @example{capi/chfl_property/string.c}
 /// @return A pointer to the property, or NULL in case of error. You can use
 ///         `chfl_last_error` to learn about the error.
 CHFL_EXPORT CHFL_PROPERTY* chfl_property_string(const char* value);
@@ -54,29 +59,29 @@ CHFL_EXPORT CHFL_PROPERTY* chfl_property_string(const char* value);
 /// Create a new property holding a 3D vector `value`.
 ///
 /// The caller of this function should free the allocated memory using
-/// `chfl_property_free`.
+/// `chfl_free`.
 ///
-/// @example{tests/capi/doc/chfl_property/vector3d.c}
+/// @example{capi/chfl_property/vector3d.c}
 /// @return A pointer to the property, or NULL in case of error. You can use
 ///         `chfl_last_error` to learn about the error.
 CHFL_EXPORT CHFL_PROPERTY* chfl_property_vector3d(const chfl_vector3d value);
 
-/// Get the type of value holded by this `property` in `kind`.
+/// Get the type of value held by this `property` in `kind`.
 ///
-/// @example{tests/capi/doc/chfl_property/kind.c}
+/// @example{capi/chfl_property/kind.c}
 /// @return The operation status code. You can use `chfl_last_error` to learn
 ///         about the error if the status code is not `CHFL_SUCCESS`.
 CHFL_EXPORT chfl_status chfl_property_get_kind(
     const CHFL_PROPERTY* property, chfl_property_kind* kind
 );
 
-/// Get the boolean value holded by this `property` in the location pointed to
+/// Get the boolean value held by this `property` in the location pointed to
 /// by `value`.
 ///
 /// This function returns CHFL_PROPERTY_ERROR if the property is not a boolean
 /// property.
 ///
-/// @example{tests/capi/doc/chfl_property/bool.c}
+/// @example{capi/chfl_property/bool.c}
 /// @return The operation status code. You can use `chfl_last_error` to learn
 ///         about the error if the status code is not `CHFL_SUCCESS`.
 CHFL_EXPORT chfl_status chfl_property_get_bool(
@@ -89,46 +94,40 @@ CHFL_EXPORT chfl_status chfl_property_get_bool(
 /// This function returns CHFL_PROPERTY_ERROR if the property is not a double
 /// property.
 ///
-/// @example{tests/capi/doc/chfl_property/double.c}
+/// @example{capi/chfl_property/double.c}
 /// @return The operation status code. You can use `chfl_last_error` to learn
 ///         about the error if the status code is not `CHFL_SUCCESS`.
 CHFL_EXPORT chfl_status chfl_property_get_double(
     const CHFL_PROPERTY* property, double* value
 );
 
-/// Get the string value holded by this `property` in the given `buffer`.
+/// Get the string value held by this `property` in the given `buffer`.
 ///
-/// This function returns CHFL_PROPERTY_ERROR if the property is not a sring
+/// This function returns CHFL_PROPERTY_ERROR if the property is not a string
 /// property.
 ///
 /// The buffer size must be passed in `buffsize`. This function will truncate
 /// the property to fit in the buffer.
 ///
-/// @example{tests/capi/doc/chfl_property/string.c}
+/// @example{capi/chfl_property/string.c}
 /// @return The operation status code. You can use `chfl_last_error` to learn
 ///         about the error if the status code is not `CHFL_SUCCESS`.
 CHFL_EXPORT chfl_status chfl_property_get_string(
     const CHFL_PROPERTY* property, char* buffer, uint64_t buffsize
 );
 
-/// Get the 3D vector value holded by this `property` in the location pointed to
+/// Get the 3D vector value held by this `property` in the location pointed to
 /// by `value`.
 ///
 /// This function returns CHFL_PROPERTY_ERROR if the property is not a 3D vector
 /// property.
 ///
-/// @example{tests/capi/doc/chfl_property/vector3d.c}
+/// @example{capi/chfl_property/vector3d.c}
 /// @return The operation status code. You can use `chfl_last_error` to learn
 ///         about the error if the status code is not `CHFL_SUCCESS`.
 CHFL_EXPORT chfl_status chfl_property_get_vector3d(
     const CHFL_PROPERTY* property, chfl_vector3d value
 );
-
-/// Free the memory associated with a `property`.
-///
-/// @example{tests/capi/doc/chfl_property/bool.c}
-/// @return `CHFL_SUCCESS`
-CHFL_EXPORT chfl_status chfl_property_free(CHFL_PROPERTY* property);
 
 #ifdef __cplusplus
 }

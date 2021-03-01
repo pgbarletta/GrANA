@@ -5,9 +5,6 @@
 #include <chemfiles.hpp>
 using namespace chemfiles;
 
-#undef assert
-#define assert CHECK
-
 TEST_CASE() {
     // [no-run]
     // [example]
@@ -20,5 +17,8 @@ TEST_CASE() {
 
     // Specify the file format to use
     auto nanotube = Trajectory("nanotube.lmp", 'r', "LAMMPS Data");
+
+    // Write a gzip-compressed file
+    auto protein = Trajectory("protein.arc.gz", 'w');
     // [example]
 }

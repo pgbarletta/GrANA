@@ -1,34 +1,47 @@
 {
-   getpwuid
+   Objc runtime
    Memcheck:Leak
    ...
-   fun:getpwuid
+   fun:_objc_flush_caches
    ...
 }
 
 {
-   wcscmp
-   Memcheck:Addr8
-   fun:wcscmp
+   Objc runtime
+   Memcheck:Leak
    ...
-   fun:exit
+   fun:__objc_personality_v0
    ...
 }
 
 {
-   objc runtime
-   Memcheck:Param
-   msg->desc.port.name
+   Objc runtime
+   Memcheck:Cond
+   ...
+   fun:__objc_personality_v0
+   ...
+}
+
+{
+   macOS stuff
+   Memcheck:Leak
    ...
    fun:libSystem_initializer
    ...
 }
 
 {
-   objc runtime
-   Memcheck:Leak
-   ...
-   fun:libdispatch_init
-   fun:libSystem_initializer
-   ...
+    macOS stuff
+    Memcheck:Cond
+    ...
+    fun:_libxpc_initializer
+    ...
+}
+
+{
+    macOS stuff
+    Memcheck:Value8
+    ...
+    fun:_libxpc_initializer
+    ...
 }

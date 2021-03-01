@@ -1,5 +1,5 @@
 # Update this value if you need to update the data file set
-set(TESTS_DATA_GIT "c26f254cd7bff7e476bf065403fbd0a6a47fea38")
+set(TESTS_DATA_GIT "8a1a48e368bc0f9611fcf8c153b3230cf5f51f8b")
 
 if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/data/${TESTS_DATA_GIT}")
     message(STATUS "Downloading test data files")
@@ -7,7 +7,7 @@ if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/data/${TESTS_DATA_GIT}")
         "https://github.com/chemfiles/tests-data/archive/${TESTS_DATA_GIT}.tar.gz"
         "${CMAKE_CURRENT_BINARY_DIR}/${TESTS_DATA_GIT}.tar.gz"
         SHOW_PROGRESS
-        EXPECTED_HASH SHA1=3b45cce20431c575364f896d763c48f5e9e31705
+        EXPECTED_HASH SHA1=dcfb388b4ec6544c94b3b63aa7cb32d7dddbe7b9
     )
 
     message(STATUS "Unpacking test data files")
@@ -32,23 +32,23 @@ if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/data/${TESTS_DATA_GIT}")
     )
 endif()
 
-set(CHFL_TEST_RUNNER "none" CACHE STRING "External runner for the tests")
-set_property(CACHE CHFL_TEST_RUNNER PROPERTY STRINGS none valgrind wine node)
-
-if(${CHFL_TEST_RUNNER} STREQUAL "valgrind")
+option(CHFL_TESTS_USE_VALGRIND OFF "Run tests using valgrind")
+if(CHFL_TESTS_USE_VALGRIND)
+    find_program(VALGRIND_EXECUTABLE valgrind)
     set(
-        RUNNER_COMMAND
-        "valgrind" "--leak-check=full" "--dsymutil=yes" "--track-origins=yes"
-        "--error-exitcode=125"
+        TEST_RUNNER
+        ${VALGRIND_EXECUTABLE} "--dsymutil=yes" "--error-exitcode=125"
+        "--leak-check=full" "--show-leak-kinds=all" "--track-origins=yes"
         "--suppressions=${CMAKE_CURRENT_SOURCE_DIR}/valgrind.supp"
+        # don't warn for replacement of operator new/delete
+        "--soname-synonyms=somalloc=nouserintercepts"
     )
-elseif(${CHFL_TEST_RUNNER} STREQUAL "wine")
-    set(RUNNER_COMMAND "wine")
-elseif(${CHFL_TEST_RUNNER} STREQUAL "node")
-    set(RUNNER_COMMAND "node")
 else()
-    set(RUNNER_COMMAND "")
+    set(TEST_RUNNER "")
 endif()
+
+# Pick up CMAKE_CROSSCOMPILING_EMULATOR to run tests if it is defined
+set(TEST_RUNNER "${CMAKE_CROSSCOMPILING_EMULATOR};${TEST_RUNNER}")
 
 if(MSVC)
     string(REGEX REPLACE "/Wall" "/W4" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
@@ -59,8 +59,12 @@ add_subdirectory(external)
 
 function(chfl_define_test _name_)
     add_test(NAME ${_name_}
-        COMMAND ${RUNNER_COMMAND} ./${_name_}
+        COMMAND ${TEST_RUNNER} ./${_name_}
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    )
+
+    set_tests_properties(${_name_}
+        PROPERTIES ENVIRONMENT "CHFL_TESTS_USE_VALGRIND=${CHFL_TESTS_USE_VALGRIND}"
     )
 
     if(WIN32)
@@ -77,20 +81,11 @@ function(chfl_unit_test _name_ _file_)
     add_executable(${_name_} ${_file_} ${CHEMFILES_OBJECTS})
     # We need to pretend we are inside the DLL to access all functions
     target_compile_definitions(${_name_} PRIVATE chemfiles_EXPORTS)
-    target_link_libraries(${_name_} ${NETCDF_LIBRARIES})
+    target_link_libraries(${_name_} $<TARGET_PROPERTY:chemfiles,LINK_LIBRARIES>)
     set_target_properties(${_name_} PROPERTIES LINKER_LANGUAGE CXX)
     target_include_directories(${_name_} SYSTEM PRIVATE ${EXTERNAL_INCLUDES})
 
     chfl_define_test(${_name_})
-
-    if(WIN32)
-        # Link to the websoket library for the hostname test
-        target_link_libraries(${_name_} ws2_32)
-    endif()
-
-    if("${CMAKE_CXX_COMPILER_ID}" MATCHES "PGI" AND "${CMAKE_SYSTEM_NAME}" MATCHES "Linux")
-        target_link_libraries(${_name_} atomic)
-    endif()
 endfunction()
 
 function(chfl_cpp_test _file_)
@@ -103,11 +98,12 @@ file(GLOB all_test_files
     ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/files/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/formats/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/selections/*.cpp
 )
 
 foreach(test_file IN LISTS all_test_files)
     chfl_cpp_test(${test_file})
-endforeach(test_file)
+endforeach()
 
 function(chfl_capi_test _file_)
     get_filename_component(_name_ ${_file_} NAME_WE)
@@ -119,13 +115,13 @@ endfunction()
 file(GLOB capi_test_files ${CMAKE_CURRENT_SOURCE_DIR}/capi/*.cpp)
 foreach(test_file IN LISTS capi_test_files)
     chfl_capi_test(${test_file})
-endforeach(test_file)
+endforeach()
 
 file(RELATIVE_PATH VERSION_FILE_PATH ${CMAKE_CURRENT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/VERSION)
 target_compile_definitions(c-misc PRIVATE "-DVERSION_FILE_PATH=\"${VERSION_FILE_PATH}\"")
 
 function(chfl_doctest _name_ _file_)
-    if(NOT CHFL_BUILD_DOCTESTS)
+    if(NOT ${CHFL_BUILD_DOCTESTS})
         return()
     endif()
 
@@ -139,15 +135,16 @@ function(chfl_doctest _name_ _file_)
 
     add_executable(${_name_} ${_file_})
     target_link_libraries(${_name_} chemfiles)
+    target_link_libraries(${_name_} ${NETCDF_LIBRARIES} ${ZLIB_LIBRARIES} ${LIBLZMA_LIBRARY})
     set_target_properties(${_name_} PROPERTIES LINKER_LANGUAGE CXX)
     set_target_properties(${_name_} PROPERTIES COMPILE_FLAGS "-UNDEBUG")
-    target_include_directories(${_name_} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/external)
+    target_include_directories(${_name_} SYSTEM PRIVATE ${EXTERNAL_INCLUDES})
 
     if(${_run_})
         chfl_define_test(${_name_})
     endif()
 
-    if("${CMAKE_CXX_COMPILER_ID}" MATCHES "PGI" AND "${CMAKE_SYSTEM_NAME}" MATCHES "Linux")
+    if(${CMAKE_CXX_COMPILER_ID} MATCHES "PGI" AND ${CMAKE_SYSTEM_NAME} MATCHES "Linux")
         target_link_libraries(${_name_} atomic)
     endif()
 endfunction()
@@ -176,7 +173,7 @@ function(chfl_cpp_doctest _file_)
     endif()
 
     chfl_doctest(${_name_} ${_file_})
-    if(CHFL_BUILD_DOCTESTS)
+    if(${CHFL_BUILD_DOCTESTS})
         target_link_libraries(${_name_} test_helpers)
     endif()
 endfunction()
@@ -184,28 +181,39 @@ endfunction()
 file(GLOB_RECURSE doctest_files ${CMAKE_CURRENT_SOURCE_DIR}/doc/**.cpp)
 foreach(test_file IN LISTS doctest_files)
     chfl_cpp_doctest(${test_file})
-endforeach(test_file)
+endforeach()
 
-file(GLOB_RECURSE capi_doctest_files ${CMAKE_CURRENT_SOURCE_DIR}/capi/doc/**.c)
+file(GLOB_RECURSE capi_doctest_files ${CMAKE_CURRENT_SOURCE_DIR}/doc/capi/**.c)
 foreach(test_file IN LISTS capi_doctest_files)
     chfl_c_doctest(${test_file})
-endforeach(test_file)
-
-foreach(test IN LISTS CHEMFILES_IGNORED_TESTS)
-    set_tests_properties(${test} PROPERTIES WILL_FAIL TRUE)
-endforeach(test)
+endforeach()
 
 # Write sample configuration files for tests
-file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/../.chemfilesrc
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/../.chemfiles.toml
 "[types]
 Oh = \"O\"
 Oz = \"O\"
 N2 = \"N\"
+
+[atoms.CH3]
+mass = 15.0
+charge = 0
+full_name = \"methyl\"
+
+[atoms.Zn]
+charge = 1.8
+
+[atoms.SO4]
+mass = 96.0
+charge = -2
+full_name = \"sulfate\"
+vdw_radius = 3.68
+covalent_radius = 2.42
 ")
 
-file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/.chemfilesrc
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/chemfiles.toml
 "[types]
-# This override the root .chemfilesrc file
+# This override the root .chemfiles.toml file
 N2 = \"N4\"
 ")
 
@@ -213,3 +221,26 @@ file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/local-file.toml
 "[types]
 Oz = \"F\"
 ")
+
+# Code linting with Python scripts
+if(${CMAKE_VERSION} VERSION_GREATER "3.12")
+    # cmake 3.12 replaced find_package(PythonInterp) with find_package(Python)
+    find_package(Python REQUIRED)
+    set(PYTHON_EXECUTABLE ${Python_EXECUTABLE})
+else()
+    # cmake 2.8.12 only knows about python <= 3.3
+    set(Python_ADDITIONAL_VERSIONS 3.9 3.8 3.7 3.6 3.5 3.4)
+    find_package(PythonInterp REQUIRED)
+endif()
+
+function(chfl_lint _file_)
+    get_filename_component(_name_ ${_file_} NAME_WE)
+    add_test(NAME ${_name_}
+        COMMAND ${PYTHON_EXECUTABLE} ${_file_}
+    )
+endfunction()
+
+file(GLOB lint_scripts ${CMAKE_CURRENT_SOURCE_DIR}/lints/*.py)
+foreach(script IN LISTS lint_scripts)
+    chfl_lint(${script})
+endforeach()

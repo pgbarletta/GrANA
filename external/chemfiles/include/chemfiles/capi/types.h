@@ -4,13 +4,12 @@
 #ifndef CHEMFILES_CHFL_TYPES_H
 #define CHEMFILES_CHFL_TYPES_H
 
-#include <stdint.h>  // NOLINT: this is both a C and C++ file
-#include <stdbool.h>  // NOLINT: this is both a C and C++ file
-#include "chemfiles/config.hpp"
-#include "chemfiles/exports.hpp"
+#include <stdint.h>
+#include <stdbool.h>  // IWYU pragma: keep
 
-#ifdef __cplusplus
-extern "C" {
+#include "chemfiles/exports.h"
+
+#if defined(__cplusplus) && !defined(INCLUDE_WHAT_YOU_USE)
 namespace chemfiles {
     class Trajectory;
     class Frame;
@@ -21,15 +20,17 @@ namespace chemfiles {
     class Property;
 }
 struct CAPISelection;
-using CHFL_TRAJECTORY = chemfiles::Trajectory;
-using CHFL_FRAME = chemfiles::Frame;
-using CHFL_ATOM = chemfiles::Atom;
-using CHFL_CELL = chemfiles::UnitCell;
-using CHFL_TOPOLOGY = chemfiles::Topology;
-using CHFL_RESIDUE = chemfiles::Residue;
-using CHFL_PROPERTY = chemfiles::Property;
-using CHFL_SELECTION = CAPISelection;
+typedef chemfiles::Trajectory CHFL_TRAJECTORY;
+typedef chemfiles::Frame CHFL_FRAME;
+typedef chemfiles::Atom CHFL_ATOM;
+typedef chemfiles::UnitCell CHFL_CELL;
+typedef chemfiles::Topology CHFL_TOPOLOGY;
+typedef chemfiles::Residue CHFL_RESIDUE;
+typedef chemfiles::Property CHFL_PROPERTY;
+typedef CAPISelection CHFL_SELECTION;
+
 #else
+
 /// An opaque type handling trajectories files.
 ///
 /// The `CHFL_TRAJECTORY` type is the main entry point when using chemfiles. A
@@ -108,6 +109,10 @@ typedef struct CHFL_SELECTION CHFL_SELECTION;
 typedef struct CHFL_PROPERTY CHFL_PROPERTY;
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /// `chfl_status` list the possible values for the return status code of
 /// chemfiles functions.
 typedef enum {  // NOLINT: this is both a C and C++ file
@@ -135,14 +140,82 @@ typedef enum {  // NOLINT: this is both a C and C++ file
     CHFL_CXX_ERROR = 255,
 } chfl_status;
 
-/// A 3-dimmensional vector for the chemfiles interface
+/// A 3-dimensional vector for the chemfiles interface
 typedef double chfl_vector3d[3];  // NOLINT: this is both a C and C++ file
 
 /// Get the version of the chemfiles library.
 ///
-/// @example{tests/capi/doc/chfl_version.c}
+/// @example{capi/chfl_version.c}
 /// @return A null-terminated string containing the version of Chemfiles.
 CHFL_EXPORT const char* chfl_version(void);
+
+/// Possible bond orders
+typedef enum {  // NOLINT: this is both a C and C++ file
+    /// Not specified
+    CHFL_BOND_UNKNOWN = 0,
+    /// Single bond
+    CHFL_BOND_SINGLE = 1,
+    /// Double bond
+    CHFL_BOND_DOUBLE = 2,
+    /// Triple bond
+    CHFL_BOND_TRIPLE = 3,
+    /// Quadruple bond (present in some metals)
+    CHFL_BOND_QUADRUPLE = 4,
+    /// Quintuplet bond (present in some metals)
+    CHFL_BOND_QUINTUPLET = 5,
+    /// Amide bond (required by some file formats)
+    CHFL_BOND_AMIDE = 254,
+    /// Aromatic bond (required by some file formats)
+    CHFL_BOND_AROMATIC = 255,
+} chfl_bond_order;
+
+/// Maximal size for a selection match
+#define CHFL_MAX_SELECTION_SIZE 4
+
+/// A `chfl_match` is a set of atomic indexes matching a given selection. The
+/// size of a match depends on the associated selection, and can vary from 1 to
+/// `CHFL_MAX_SELECTION_SIZE`.
+typedef struct {  // NOLINT: this is both a C and C++ file
+    /// The actual size of the match. Elements in `atoms` are significant up
+    /// to this value, and filled with `(uint64_t)-1` for all the other values.
+    uint64_t size;
+    /// Atomic indexes matching the associated selection
+    uint64_t atoms[CHFL_MAX_SELECTION_SIZE];
+} chfl_match;
+
+
+/// A `chfl_format_metadata` contains metadata associated with one format
+typedef struct {
+    /// Name of the format
+    const char* name;
+    /// Extension associated with the format, or `NULL` if there is no extension
+    /// associated.
+    const char* extension;
+    /// Extended, user-facing description of the format
+    const char* description;
+    /// URL pointing to the format definition/reference
+    const char* reference;
+
+    /// Is reading files in this format implemented?
+    bool read;
+    /// Is writing files in this format implemented?
+    bool write;
+    /// Does this format support in-memory IO?
+    bool memory;
+
+    /// Does this format support storing atomic positions?
+    bool positions;
+    /// Does this format support storing atomic velocities?
+    bool velocities;
+    /// Does this format support storing unit cell information?
+    bool unit_cell;
+    /// Does this format support storing atom names or types?
+    bool atoms;
+    /// Does this format support storing bonds between atoms?
+    bool bonds;
+    /// Does this format support storing residues?
+    bool residues;
+} chfl_format_metadata;
 
 #ifdef __cplusplus
 }

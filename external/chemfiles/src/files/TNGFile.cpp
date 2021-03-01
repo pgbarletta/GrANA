@@ -3,19 +3,24 @@
 
 #include "chemfiles/files/TNGFile.hpp"
 
-#include "chemfiles/Error.hpp"
 #include "chemfiles/utils.hpp"
+#include "chemfiles/error_fmt.hpp"
+
 using namespace chemfiles;
 
 #define STRING_0(x) #x
 #define STRING(x) STRING_0(x)
 #define CHECK(x) check_tng_error((x), (STRING(x)))
 
-TNGFile::TNGFile(std::string filename, File::Mode mode): File(std::move(filename), mode), handle_(nullptr) {
-    CHECK(tng_util_trajectory_open(this->filename().c_str(), mode, &handle_));
+TNGFile::TNGFile(std::string path, File::Mode mode): File(std::move(path), mode, File::DEFAULT), handle_(nullptr) {
+    CHECK(tng_util_trajectory_open(this->path().c_str(), mode, &handle_));
 
     if (mode == File::READ) {
-        CHECK(tng_file_headers_read(handle_, TNG_USE_HASH));
+        auto status = tng_file_headers_read(handle_, TNG_USE_HASH);
+        if (status != TNG_SUCCESS) {
+            tng_util_trajectory_close(&handle_);
+            throw file_error("could not open the file at '{}'", this->path());
+        }
     }
 
     if (mode == File::WRITE || mode == File::APPEND) {
@@ -37,28 +42,20 @@ TNGFile::TNGFile(std::string filename, File::Mode mode): File(std::move(filename
     }
 }
 
-TNGFile::~TNGFile() noexcept {
+TNGFile::~TNGFile() {
     tng_util_trajectory_close(&handle_);
 }
 
 void chemfiles::check_tng_error(tng_function_status status, const std::string& function) {
     switch (status) {
     case TNG_FAILURE:
-        throw chemfiles::FileError(
-            "Error while calling " + function + " in the TNG library"
-        );
+        throw file_error("error while calling {} in the TNG library", function);
     case TNG_CRITICAL:
-        throw chemfiles::FileError(
-            "Critical error while calling " + function + " in the TNG library"
-        );
+        throw file_error("critical error while calling {} in the TNG library", function);
     case TNG_SUCCESS:
         // Do nothing, this is good
         break;
     default:
-        throw chemfiles::FileError(
-            "Unknown status code from TNG library: "
-            + std::to_string(static_cast<unsigned>(status))
-        );
-        break;
+        throw file_error("unknown status code from TNG library: {}", status);
     }
 }

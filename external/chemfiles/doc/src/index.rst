@@ -30,12 +30,12 @@ interfaces to chemfiles are accessibles at the following places:
 
 * `Python interface`_, usable with Python 2 and 3;
 * `Fortran interface`_, for Fortran 2003;
-* `Julia interface`_, for `Julia`_ 0.4+;
+* `Julia interface`_, for `Julia`_ 0.6+;
 * `Rust interface`_, for the `Rust`_ language;
 
 .. note::
 
-    Chemfiles follow `semantic versionning <http://semver.org/>`_. This means
+    Chemfiles follow `semantic versionning <https://semver.org/>`_. This means
     that all 0.x.y versions are compatible for all y, but 0.x and 0.(x+1) are
     not compatible. This also means that when chemfiles reaches 1.0.0, all code
     using 1.0.0 will be compatible with 1.x.y for any x and y.
@@ -44,7 +44,7 @@ interfaces to chemfiles are accessibles at the following places:
 .. _Fortran interface: https://chemfiles.github.io/chemfiles.f03/latest/
 .. _Julia interface: https://chemfiles.github.io/Chemfiles.jl/latest/
 .. _Rust interface: https://chemfiles.github.io/chemfiles.rs/latest/
-.. _Julia: http://julialang.org/
+.. _Julia: https://julialang.org/
 .. _Rust: https://www.rust-lang.org/
 
 User manual
@@ -67,12 +67,11 @@ in our `Gitter chat room <https://gitter.im/chemfiles/chemfiles>`_.
     selections
     configuration
     properties
-    others
 
 .. _classes-reference:
 
-Classes and functions reference
--------------------------------
+API reference
+-------------
 
 All the public classes (for the C++ interface) and functions (for the C
 interface) are extensively documented here.
@@ -91,5 +90,3 @@ Developer documentation
 
    devdoc/contributing
    devdoc/internals
-   devdoc/file
-   devdoc/format

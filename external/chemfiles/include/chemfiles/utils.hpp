@@ -6,34 +6,134 @@
 
 #include <vector>
 #include <string>
-#include <sstream>
-#include <cctype>
 #include <algorithm>
 
-#include "chemfiles/Error.hpp"
+#include "chemfiles/string_view.hpp"
 
 namespace chemfiles {
 
-inline std::vector<std::string> split(const std::string &s, char delim) {
-    std::stringstream ss(s);
-    std::string item;
-    std::vector<std::string> elems;
-    while (std::getline(ss, item, delim)) {
-        if (item != "") {
-            elems.push_back(item);
+/// Split `string` into components delimited by `delim`, ignoring empty
+/// components.
+inline std::vector<string_view> split(string_view string, char delim) {
+    std::vector<string_view> elems;
+    size_t last = 0;
+    for (size_t i = 0; i<string.length(); i++) {
+        if (string[i] == delim) {
+            if (last != i) {
+                // Don't add empty elements
+                elems.push_back(string.substr(last, i - last));
+            }
+            last = i + 1;
         }
     }
+
+    if (last < string.length()) {
+        elems.push_back(string.substr(last, string.length() - last));
+    }
+
     return elems;
 }
 
-inline std::string trim(const std::string& str) {
-    auto front = std::find_if_not(str.begin(), str.end(), [](int c) {
-        return std::isspace(c);
-    });
-    auto back = std::find_if_not(str.rbegin(), str.rend(), [](int c) {
-        return std::isspace(c);
-    }).base();
-    return (back <= front ? std::string() : std::string(front, back));
+inline std::vector<string_view> split(const char* string, char delim) {
+    return split(string_view(string), delim);
+}
+
+// disallow temporary string
+std::vector<string_view> split(std::string&& string, char delim) = delete;
+
+// Check whether the given character is an ASCII whitespace
+inline bool is_ascii_whitespace(char c) {
+    return c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == '\x0C';
+}
+
+// Check whether the given character is an ASCII lowercase letter (a-z)
+inline bool is_ascii_lowercase(char c) {
+    return 'a' <= c && c <= 'z';
+}
+
+// Check whether the given character is an ASCII uppercase letter (A-Z)
+inline bool is_ascii_uppercase(char c) {
+    return 'A' <= c && c <= 'Z';
+}
+
+// Check whether the given character is an ASCII letter (a-z, A-Z)
+inline bool is_ascii_letter(char c) {
+    return is_ascii_lowercase(c) || is_ascii_uppercase(c);
+}
+
+// Check whether the given character is an ASCII digit (0-9)
+inline bool is_ascii_digit(char c) {
+    return '0' <= c && c <= '9';
+}
+
+// Check whether the given character is an ASCII digit (0-9) or an ASCII letter
+// (a-z, A-Z)
+inline bool is_ascii_alphanumeric(char c) {
+    return is_ascii_letter(c) || is_ascii_digit(c);
+}
+
+inline char to_ascii_lowercase(char c) {
+    if (is_ascii_uppercase(c)) {
+        return static_cast<char>(c - ('Z' - 'z'));
+    } else {
+        return c;
+    }
+}
+
+inline char to_ascii_uppercase(char c) {
+    if (is_ascii_lowercase(c)) {
+        return static_cast<char>(c + ('Z' - 'z'));
+    } else {
+        return c;
+    }
+}
+
+/// Remove whitespaces at the begining and end of `string`
+inline string_view trim(string_view string) {
+    auto begin = string.begin();
+    auto end = string.end();
+    while (begin != end && is_ascii_whitespace(*begin)) {
+        begin++;
+    }
+
+    if (begin != end) {
+        end--;
+        while (end != begin && is_ascii_whitespace(*end)) {
+            end--;
+        }
+        end++;
+    }
+
+    return string_view(begin, static_cast<size_t>(end - begin));
+}
+
+inline string_view trim(const char* string) {
+    return trim(string_view(string));
+}
+
+// disallow temporary string
+string_view trim(std::string&& string) = delete;
+
+/// Transform all characters in ASCII range in the given `string` to lower case.
+///
+/// Non letters and characters oustide of ASCII will be left untouched
+inline void to_ascii_lowercase(std::string& input) {
+    std::transform(input.begin(), input.end(), input.begin(),
+        [](std::string::value_type c) {
+            return to_ascii_lowercase(c);
+        }
+    );
+}
+
+/// Transform all characters in ASCII range in the given `string` to upper case.
+///
+/// Non letters and characters oustide of ASCII will be left untouched
+inline void to_ascii_uppercase(std::string& input) {
+    std::transform(input.begin(), input.end(), input.begin(),
+        [](std::string::value_type c) {
+            return to_ascii_uppercase(c);
+        }
+    );
 }
 
 /// Get the name of the computer used
@@ -42,40 +142,6 @@ std::string hostname();
 std::string user_name();
 /// Get the process current directory
 std::string current_directory();
-
-/// Convert a string to double, throwing a `chemfiles::Error` if the string is
-/// not a valid double.
-inline double string2double(const std::string& string) {
-    try {
-        size_t length = 0;
-        double value = std::stod(string, &length);
-        if (length != string.length()) {
-            throw chemfiles::Error("Can not convert '" + string + "' to number");
-        }
-        return value;
-    } catch (const std::invalid_argument&) {
-        throw chemfiles::Error("Can not convert '" + string + "' to number");
-    } catch (const std::out_of_range&) {
-        throw chemfiles::Error("'" + string + "' is out of range for double type");
-    }
-}
-
-/// Convert a string to long long integer, throwing a `chemfiles::Error` if the
-/// string is not a valid long long int.
-inline long long int string2longlong(const std::string& string) {
-    try {
-        size_t length = 0;
-        long long int value = std::stoll(string, &length);
-        if (length != string.length()) {
-            throw chemfiles::Error("Can not convert '" + string + "' to number");
-        }
-        return value;
-    } catch (const std::invalid_argument&) {
-        throw chemfiles::Error("Can not convert '" + string + "' to number");
-    } catch (const std::out_of_range&) {
-        throw chemfiles::Error("'" + string + "' is out of range for long long int type");
-    }
-}
 
 }
 

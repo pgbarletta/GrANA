@@ -1,40 +1,54 @@
 // Chemfiles, a modern library for chemistry file reading and writing
 // Copyright (C) Guillaume Fraux and contributors -- BSD license
 
+#include <cstdint>
+#include <string>
+
+#include "chemfiles/capi/types.h"
+#include "chemfiles/capi/misc.h"
+#include "chemfiles/capi/utils.hpp"
+#include "chemfiles/capi/shared_allocator.hpp"
+
 #include "chemfiles/capi/frame.h"
-#include "chemfiles/capi.hpp"
 
 #include "chemfiles/Frame.hpp"
-#include "chemfiles/ErrorFmt.hpp"
+#include "chemfiles/error_fmt.hpp"
+#include "chemfiles/Property.hpp"
+#include "chemfiles/Connectivity.hpp"
+
+#include "chemfiles/types.hpp"
+#include "chemfiles/external/optional.hpp"
+#include "chemfiles/external/span.hpp"
+
 using namespace chemfiles;
 
 extern "C" CHFL_FRAME* chfl_frame(void) {
     CHFL_FRAME* frame = nullptr;
     CHFL_ERROR_GOTO(
-        frame = new Frame();
+        frame = shared_allocator::make_shared<Frame>();
     )
     return frame;
 error:
-    delete frame;
+    chfl_free(frame);
     return nullptr;
 }
 
 extern "C" CHFL_FRAME* chfl_frame_copy(const CHFL_FRAME* const frame) {
     CHFL_FRAME* new_frame = nullptr;
     CHFL_ERROR_GOTO(
-        new_frame = new Frame(frame->clone());
+        new_frame = shared_allocator::make_shared<Frame>(frame->clone());
     )
     return new_frame;
 error:
-    delete new_frame;
+    chfl_free(new_frame);
     return nullptr;
 }
 
-extern "C" chfl_status chfl_frame_atoms_count(const CHFL_FRAME* const frame, uint64_t *size) {
+extern "C" chfl_status chfl_frame_atoms_count(const CHFL_FRAME* const frame, uint64_t* const count) {
     CHECK_POINTER(frame);
-    CHECK_POINTER(size);
+    CHECK_POINTER(count);
     CHFL_ERROR_CATCH(
-        *size = frame->size();
+        *count = static_cast<uint64_t>(frame->size());
     )
 }
 
@@ -73,9 +87,9 @@ extern "C" chfl_status chfl_frame_velocities(CHFL_FRAME* const frame, chfl_vecto
 }
 
 extern "C" chfl_status chfl_frame_add_atom(
-	CHFL_FRAME* const frame, 
-	const CHFL_ATOM* const atom, 
-	const chfl_vector3d position, 
+	CHFL_FRAME* const frame,
+	const CHFL_ATOM* const atom,
+	const chfl_vector3d position,
 	const chfl_vector3d velocity
 ) {
     CHECK_POINTER(frame);
@@ -93,7 +107,7 @@ extern "C" chfl_status chfl_frame_add_atom(
 extern "C" chfl_status chfl_frame_remove(CHFL_FRAME* const frame, uint64_t i) {
     CHECK_POINTER(frame);
     CHFL_ERROR_CATCH(
-        frame->remove(static_cast<size_t>(i));
+        frame->remove(checked_cast(i));
     )
 }
 
@@ -150,10 +164,10 @@ extern "C" chfl_status chfl_frame_set_step(CHFL_FRAME* const frame, uint64_t ste
     )
 }
 
-extern "C" chfl_status chfl_frame_guess_topology(CHFL_FRAME* const frame) {
+extern "C" chfl_status chfl_frame_guess_bonds(CHFL_FRAME* const frame) {
     CHECK_POINTER(frame);
     CHFL_ERROR_CATCH(
-        frame->guess_topology();
+        frame->guess_bonds();
     )
 }
 
@@ -193,6 +207,32 @@ extern "C" chfl_status chfl_frame_out_of_plane(const CHFL_FRAME* const frame, ui
     )
 }
 
+extern "C" chfl_status chfl_frame_properties_count(const CHFL_FRAME* const frame, uint64_t* const count) {
+    CHECK_POINTER(frame);
+    CHECK_POINTER(count);
+    CHFL_ERROR_CATCH(
+        *count = static_cast<uint64_t>(frame->properties().size());
+    )
+}
+
+extern "C" chfl_status chfl_frame_list_properties(const CHFL_FRAME* const frame, const char* names[], uint64_t count) {
+    CHECK_POINTER(frame);
+    CHECK_POINTER(names);
+    CHFL_ERROR_CATCH(
+        auto& properties = frame->properties();
+        if (checked_cast(count) != properties.size()) {
+            set_last_error("wrong data size in function 'chfl_frame_list_properties'.");
+            return CHFL_MEMORY_ERROR;
+        }
+
+        size_t i = 0;
+        for (auto& it: properties) {
+            names[i] = it.first.c_str();
+            i++;
+        }
+    )
+}
+
 extern "C" chfl_status chfl_frame_set_property(CHFL_FRAME* const frame, const char* name, const CHFL_PROPERTY* const property) {
     CHECK_POINTER(frame);
     CHECK_POINTER(name);
@@ -209,14 +249,14 @@ extern "C" CHFL_PROPERTY* chfl_frame_get_property(const CHFL_FRAME* const frame,
     CHFL_ERROR_GOTO(
         auto atom_property = frame->get(name);
         if (atom_property) {
-            property = new Property(*atom_property);
+            property = shared_allocator::make_shared<Property>(*atom_property);
         } else {
             throw property_error("can not find a property named '{}' in this frame", name);
         }
     )
     return property;
 error:
-    delete property;
+    chfl_free(property);
     return nullptr;
 }
 
@@ -227,10 +267,24 @@ extern "C" chfl_status chfl_frame_add_bond(CHFL_FRAME* const frame, uint64_t i, 
     )
 }
 
+extern "C" chfl_status chfl_frame_bond_with_order(CHFL_FRAME* const frame, uint64_t i, uint64_t j, chfl_bond_order bond_order) {
+    CHECK_POINTER(frame);
+    CHFL_ERROR_CATCH(
+        frame->add_bond(checked_cast(i), checked_cast(j), static_cast<Bond::BondOrder>(bond_order));
+    )
+}
+
 extern "C" chfl_status chfl_frame_remove_bond(CHFL_FRAME* const frame, uint64_t i, uint64_t j) {
     CHECK_POINTER(frame);
     CHFL_ERROR_CATCH(
         frame->remove_bond(checked_cast(i), checked_cast(j));
+    )
+}
+
+extern "C" chfl_status chfl_frame_clear_bonds(CHFL_FRAME* const frame) {
+    CHECK_POINTER(frame);
+    CHFL_ERROR_CATCH(
+        frame->clear_bonds();
     )
 }
 
@@ -240,9 +294,4 @@ extern "C" chfl_status chfl_frame_add_residue(CHFL_FRAME* const frame, const CHF
     CHFL_ERROR_CATCH(
         frame->add_residue(*residue);
     )
-}
-
-extern "C" chfl_status chfl_frame_free(CHFL_FRAME* const frame) {
-    delete frame;
-    return CHFL_SUCCESS;
 }

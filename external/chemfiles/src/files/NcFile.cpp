@@ -1,7 +1,16 @@
 // Chemfiles, a modern library for chemistry file reading and writing
 // Copyright (C) Guillaume Fraux and contributors -- BSD license
 
+#include <cassert>
+#include <string>
+#include <vector>
+
+#include <netcdf.h>
+
+#include "chemfiles/File.hpp"
 #include "chemfiles/files/NcFile.hpp"
+#include "chemfiles/error_fmt.hpp"
+
 using namespace chemfiles;
 
 size_t chemfiles::nc::hyperslab_size(const count_t& count) {
@@ -34,8 +43,7 @@ std::vector<size_t> nc::NcVariable::dimmensions() const {
     return result;
 }
 
-
-std::string nc::NcVariable::attribute(const std::string& name) const {
+std::string nc::NcVariable::string_attribute(const std::string& name) const {
     size_t size = 0;
     int status = nc_inq_attlen(file_id_, var_id_, name.c_str(), &size);
     nc::check(status, "can not read attribute id for attribute '{}'", name);
@@ -46,10 +54,29 @@ std::string nc::NcVariable::attribute(const std::string& name) const {
     return value;
 }
 
+float nc::NcVariable::float_attribute(const std::string& name) const {
+    size_t size = 0;
+    int status = nc_inq_attlen(file_id_, var_id_, name.c_str(), &size);
+    nc::check(status, "can not read attribute id for attribute '{}'", name);
+    if (size != 1) {
+        throw file_error("expected one value for attribute '{}'", name);
+    }
 
-void nc::NcVariable::add_attribute(const std::string& name, const std::string& value) {
+    float value = -1;
+    status = nc_get_att_float(file_id_, var_id_, name.c_str(), &value);
+    nc::check(status, "can not read attribute float for attribute '{}'", name);
+    return value;
+}
+
+void nc::NcVariable::add_string_attribute(const std::string& name, const std::string& value) {
     int status = nc_put_att_text(file_id_, var_id_, name.c_str(), value.size(), value.c_str());
     nc::check(status, "can not set attribute '{}'", name);
+}
+
+bool nc::NcVariable::attribute_exists(const std::string& name) const {
+    nc::netcdf_id_t id = -1;
+    auto status = nc_inq_attid(file_id_, var_id_, name.c_str(), &id);
+    return status == NC_NOERR;
 }
 
 std::vector<float> nc::NcFloat::get(count_t start, count_t count) const {
@@ -95,31 +122,33 @@ void nc::NcChar::add(const std::vector<std::string>& data) {
     }
 }
 
-NcFile::NcFile(const std::string& filename, File::Mode mode)
-    : File(filename, mode), nc_mode_(DATA) {
+NcFile::NcFile(std::string path, File::Mode mode)
+    : File(std::move(path), mode, File::DEFAULT), nc_mode_(DATA) {
     auto status = NC_NOERR;
 
     switch (mode) {
     case File::READ:
-        status = nc_open(filename.c_str(), NC_NOWRITE, &file_id_);
+        status = nc_open(this->path().c_str(), NC_NOWRITE, &file_id_);
         break;
     case File::APPEND:
-        status = nc_open(filename.c_str(), NC_WRITE, &file_id_);
+        status = nc_open(this->path().c_str(), NC_WRITE, &file_id_);
         break;
     case File::WRITE:
-        status = nc_create(filename.c_str(), NC_64BIT_OFFSET | NC_CLASSIC_MODEL, &file_id_);
+        status = nc_create(this->path().c_str(), NC_64BIT_OFFSET | NC_CLASSIC_MODEL, &file_id_);
         // Put the file in DATA mode. This can only fail for bad id, which we
         // check later.
         nc_enddef(file_id_);
         break;
     }
 
-    nc::check(status, "could not open the file '{}'", filename);
+    nc::check(status, "could not open the file '{}'", this->path());
 }
 
-NcFile::~NcFile() noexcept {
+NcFile::~NcFile() {
     auto status = nc_close(file_id_);
     assert(status == NC_NOERR);
+    // silent "unused variable" when compiling without assertions
+    (void)status;
 }
 
 void NcFile::set_nc_mode(NcMode mode) {
@@ -172,16 +201,16 @@ void NcFile::add_global_attribute(const std::string& name, const std::string& va
 size_t NcFile::dimension(const std::string& name) const {
     auto size = optional_dimension(name, static_cast<size_t>(-1));
     if (size == static_cast<size_t>(-1)) {
-        throw file_error("Missing dimmension '{}' in NetCDF file", name);
+        throw file_error("missing dimmension '{}' in NetCDF file", name);
     }
     return size;
 }
 
 size_t NcFile::optional_dimension(const std::string& name, size_t value) const {
     // Get the dimmension id
-    auto dim_id = nc::netcdf_id_t(-1);
+    nc::netcdf_id_t dim_id = -1;
     auto status = nc_inq_dimid(file_id_, name.c_str(), &dim_id);
-    if (dim_id == nc::netcdf_id_t(-1)) {
+    if (dim_id == -1) {
         return value;
     }
     nc::check(status, "can not get dimmension id for '{}'", name);
@@ -197,13 +226,13 @@ size_t NcFile::optional_dimension(const std::string& name, size_t value) const {
 void NcFile::add_dimension(const std::string& name, size_t value) {
     assert(nc_mode() == DEFINE &&
            "File must be in define mode to add dimmension");
-    auto dim_id = nc::netcdf_id_t(-1);
+    nc::netcdf_id_t dim_id = -1;
     auto status = nc_def_dim(file_id_, name.c_str(), value, &dim_id);
     nc::check(status, "can not add dimension '{}'", name);
 }
 
 bool NcFile::variable_exists(const std::string& name) const {
-    auto id = nc::netcdf_id_t(-1);
+    nc::netcdf_id_t id = -1;
     auto status = nc_inq_varid(file_id_, name.c_str(), &id);
     return status == NC_NOERR;
 }

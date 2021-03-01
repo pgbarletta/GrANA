@@ -1,39 +1,50 @@
 // Chemfiles, a modern library for chemistry file reading and writing
 // Copyright (C) Guillaume Fraux and contributors -- BSD license
+
+#include <cstdint>
 #include <cstring>
+#include <string>
+
+#include "chemfiles/capi/types.h"
+#include "chemfiles/capi/misc.h"
+#include "chemfiles/capi/utils.hpp"
+#include "chemfiles/capi/shared_allocator.hpp"
 
 #include "chemfiles/capi/atom.h"
-#include "chemfiles/capi.hpp"
 
-#include "chemfiles/ErrorFmt.hpp"
 #include "chemfiles/Atom.hpp"
 #include "chemfiles/Frame.hpp"
 #include "chemfiles/Topology.hpp"
+#include "chemfiles/error_fmt.hpp"
+#include "chemfiles/Property.hpp"
+
+#include "chemfiles/external/optional.hpp"
+
 using namespace chemfiles;
 
 extern "C" CHFL_ATOM* chfl_atom(const char* name) {
     CHFL_ATOM* atom = nullptr;
     CHFL_ERROR_GOTO(
-        atom = new Atom(name);
+        atom = shared_allocator::make_shared<Atom>(name);
     )
     return atom;
 error:
-    delete atom;
+    chfl_free(atom);
     return nullptr;
 }
 
 extern "C" CHFL_ATOM* chfl_atom_copy(const CHFL_ATOM* const atom) {
     CHFL_ATOM* new_atom = nullptr;
     CHFL_ERROR_GOTO(
-        new_atom = new Atom(*atom);
+        new_atom = shared_allocator::make_shared<Atom>(*atom);
     )
     return new_atom;
 error:
-    delete new_atom;
+    chfl_free(new_atom);
     return nullptr;
 }
 
-extern "C" CHFL_ATOM* chfl_atom_from_frame(const CHFL_FRAME* const frame, uint64_t index) {
+extern "C" CHFL_ATOM* chfl_atom_from_frame(CHFL_FRAME* const frame, uint64_t index) {
     CHFL_ATOM* atom = nullptr;
     CHECK_POINTER_GOTO(frame);
     CHFL_ERROR_GOTO(
@@ -44,15 +55,15 @@ extern "C" CHFL_ATOM* chfl_atom_from_frame(const CHFL_FRAME* const frame, uint64
                 frame->size(), index
             );
         }
-        atom = new Atom(frame->topology()[checked_cast(index)]);
+        atom = shared_allocator::shared_ptr<Atom>(frame, &(*frame)[checked_cast(index)]);
     )
     return atom;
 error:
-    delete atom;
+    chfl_free(atom);
     return nullptr;
 }
 
-extern "C" CHFL_ATOM* chfl_atom_from_topology(const CHFL_TOPOLOGY* const topology, uint64_t index) {
+extern "C" CHFL_ATOM* chfl_atom_from_topology(CHFL_TOPOLOGY* const topology, uint64_t index) {
     CHFL_ATOM* atom = nullptr;
     CHECK_POINTER_GOTO(topology);
     CHFL_ERROR_GOTO(
@@ -63,11 +74,11 @@ extern "C" CHFL_ATOM* chfl_atom_from_topology(const CHFL_TOPOLOGY* const topolog
                 topology->size(), index
             );
         }
-        atom = new Atom((*topology)[checked_cast(index)]);
+        atom = shared_allocator::shared_ptr<Atom>(topology, &(*topology)[checked_cast(index)]);
     )
     return atom;
 error:
-    delete atom;
+    chfl_free(atom);
     return nullptr;
 }
 
@@ -173,6 +184,32 @@ extern "C" chfl_status chfl_atom_atomic_number(const CHFL_ATOM* const atom, uint
     )
 }
 
+extern "C" chfl_status chfl_atom_properties_count(const CHFL_ATOM* const atom, uint64_t* const count) {
+    CHECK_POINTER(atom);
+    CHECK_POINTER(count);
+    CHFL_ERROR_CATCH(
+        *count = static_cast<uint64_t>(atom->properties().size());
+    )
+}
+
+extern "C" chfl_status chfl_atom_list_properties(const CHFL_ATOM* const atom, const char* names[], uint64_t count) {
+    CHECK_POINTER(atom);
+    CHECK_POINTER(names);
+    CHFL_ERROR_CATCH(
+        auto& properties = atom->properties();
+        if (checked_cast(count) != properties.size()) {
+            set_last_error("wrong data size in function 'chfl_atom_list_properties'.");
+            return CHFL_MEMORY_ERROR;
+        }
+
+        size_t i = 0;
+        for (auto& it: properties) {
+            names[i] = it.first.c_str();
+            i++;
+        }
+    )
+}
+
 extern "C" chfl_status chfl_atom_set_property(CHFL_ATOM* const atom, const char* name, const CHFL_PROPERTY* const property) {
     CHECK_POINTER(atom);
     CHECK_POINTER(name);
@@ -189,18 +226,13 @@ extern "C" CHFL_PROPERTY* chfl_atom_get_property(const CHFL_ATOM* const atom, co
     CHFL_ERROR_GOTO(
         auto atom_property = atom->get(name);
         if (atom_property) {
-            property = new Property(*atom_property);
+            property = shared_allocator::make_shared<Property>(*atom_property);
         } else {
             throw property_error("can not find a property named '{}' in this atom", name);
         }
     )
     return property;
 error:
-    delete property;
+    chfl_free(property);
     return nullptr;
-}
-
-extern "C" chfl_status chfl_atom_free(CHFL_ATOM* const atom) {
-    delete atom;
-    return CHFL_SUCCESS;
 }

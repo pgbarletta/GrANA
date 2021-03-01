@@ -1,91 +1,101 @@
 // Chemfiles, a modern library for chemistry file reading and writing
 // Copyright (C) Guillaume Fraux and contributors -- BSD license
 
+#include <cstdint>
 #include <cstring>
+#include <string>
+
+#include "chemfiles/capi/types.h"
+#include "chemfiles/capi/misc.h"
+#include "chemfiles/capi/utils.hpp"
+#include "chemfiles/capi/shared_allocator.hpp"
 
 #include "chemfiles/capi/residue.h"
-#include "chemfiles/capi.hpp"
 
-#include "chemfiles/ErrorFmt.hpp"
+#include "chemfiles/error_fmt.hpp"
+#include "chemfiles/Property.hpp"
 #include "chemfiles/Residue.hpp"
 #include "chemfiles/Topology.hpp"
+
+#include "chemfiles/external/optional.hpp"
+
 using namespace chemfiles;
 
 extern "C" CHFL_RESIDUE* chfl_residue(const char* name) {
     CHFL_RESIDUE* residue = nullptr;
     CHECK_POINTER_GOTO(name);
     CHFL_ERROR_GOTO(
-        residue = new Residue(std::string(name));
+        residue = shared_allocator::make_shared<Residue>(std::string(name));
     )
     return residue;
 error:
-    delete residue;
+    chfl_free(residue);
     return nullptr;
 }
 
-extern "C" CHFL_RESIDUE* chfl_residue_with_id(const char* name, uint64_t resid) {
+extern "C" CHFL_RESIDUE* chfl_residue_with_id(const char* name, int64_t resid) {
     CHFL_RESIDUE* residue = nullptr;
     CHECK_POINTER_GOTO(name);
     CHFL_ERROR_GOTO(
-        residue = new Residue(std::string(name), resid);
+        residue = shared_allocator::make_shared<Residue>(std::string(name), resid);
     )
     return residue;
 error:
-    delete residue;
+    chfl_free(residue);
     return nullptr;
 }
 
-extern "C" CHFL_RESIDUE* chfl_residue_from_topology(const CHFL_TOPOLOGY* const topology, uint64_t i) {
-    CHFL_RESIDUE* residue = nullptr;
+extern "C" const CHFL_RESIDUE* chfl_residue_from_topology(const CHFL_TOPOLOGY* const topology, uint64_t i) {
+    const CHFL_RESIDUE* residue = nullptr;
     CHECK_POINTER_GOTO(topology);
     CHFL_ERROR_GOTO(
-        residue = new Residue(topology->residue(checked_cast(i)));
+        residue = shared_allocator::shared_ptr<Residue>(topology, &topology->residue(checked_cast(i)));
     )
     return residue;
 error:
-    delete residue;
+    chfl_free(residue);
     return nullptr;
 }
 
-extern "C" CHFL_RESIDUE* chfl_residue_for_atom(const CHFL_TOPOLOGY* const topology, uint64_t i) {
-    CHFL_RESIDUE* residue = nullptr;
+extern "C" const CHFL_RESIDUE* chfl_residue_for_atom(const CHFL_TOPOLOGY* const topology, uint64_t i) {
+    const CHFL_RESIDUE* residue = nullptr;
     CHECK_POINTER_GOTO(topology);
     CHFL_ERROR_GOTO(
-        auto res = topology->residue_for_atom(checked_cast(i));
-        if (res) {
-            residue = new Residue(*res);
+        auto optional = topology->residue_for_atom(checked_cast(i));
+        if (optional) {
+            residue = shared_allocator::shared_ptr<Residue>(topology, &*optional);
         }
     )
     return residue;
 error:
-    delete residue;
+    chfl_free(residue);
     return nullptr;
 }
 
 extern "C" CHFL_RESIDUE* chfl_residue_copy(const CHFL_RESIDUE* const residue) {
     CHFL_RESIDUE* new_residue = nullptr;
     CHFL_ERROR_GOTO(
-        new_residue = new Residue(*residue);
+        new_residue = shared_allocator::make_shared<Residue>(*residue);
     )
     return new_residue;
 error:
-    delete new_residue;
+    chfl_free(new_residue);
     return nullptr;
 }
 
-extern "C" chfl_status chfl_residue_atoms_count(const CHFL_RESIDUE* const residue, uint64_t* size) {
+extern "C" chfl_status chfl_residue_atoms_count(const CHFL_RESIDUE* const residue, uint64_t* const count) {
     CHECK_POINTER(residue);
-    CHECK_POINTER(size);
+    CHECK_POINTER(count);
     CHFL_ERROR_CATCH(
-        *size = residue->size();
+        *count = static_cast<uint64_t>(residue->size());
     )
 }
 
-extern "C" chfl_status chfl_residue_atoms(const CHFL_RESIDUE* const residue, uint64_t atoms[], uint64_t natoms) {
+extern "C" chfl_status chfl_residue_atoms(const CHFL_RESIDUE* const residue, uint64_t atoms[], uint64_t count) {
     CHECK_POINTER(residue);
     CHECK_POINTER(atoms);
     CHFL_ERROR_CATCH(
-        if (natoms != residue->size()) {
+        if (checked_cast(count) != residue->size()) {
             set_last_error("wrong data size in function 'chfl_residue_atoms'.");
             return CHFL_MEMORY_ERROR;
         }
@@ -98,7 +108,7 @@ extern "C" chfl_status chfl_residue_atoms(const CHFL_RESIDUE* const residue, uin
     )
 }
 
-extern "C" chfl_status chfl_residue_id(const CHFL_RESIDUE* const residue, uint64_t* id) {
+extern "C" chfl_status chfl_residue_id(const CHFL_RESIDUE* const residue, int64_t* id) {
     CHECK_POINTER(residue);
     CHECK_POINTER(id);
     CHFL_ERROR_CATCH(
@@ -134,7 +144,55 @@ extern "C" chfl_status chfl_residue_contains(const CHFL_RESIDUE* const residue, 
     )
 }
 
-extern "C" chfl_status chfl_residue_free(CHFL_RESIDUE* const residue) {
-    delete residue;
-    return CHFL_SUCCESS;
+extern "C" chfl_status chfl_residue_properties_count(const CHFL_RESIDUE* const residue, uint64_t* const count) {
+    CHECK_POINTER(residue);
+    CHECK_POINTER(count);
+    CHFL_ERROR_CATCH(
+        *count = static_cast<uint64_t>(residue->properties().size());
+    )
+}
+
+extern "C" chfl_status chfl_residue_list_properties(const CHFL_RESIDUE* const residue, const char* names[], uint64_t count) {
+    CHECK_POINTER(residue);
+    CHECK_POINTER(names);
+    CHFL_ERROR_CATCH(
+        auto& properties = residue->properties();
+        if (checked_cast(count) != properties.size()) {
+            set_last_error("wrong data size in function 'chfl_frame_list_properties'.");
+            return CHFL_MEMORY_ERROR;
+        }
+
+        size_t i = 0;
+        for (auto& it: properties) {
+            names[i] = it.first.c_str();
+            i++;
+        }
+    )
+}
+
+extern "C" chfl_status chfl_residue_set_property(CHFL_RESIDUE* const residue, const char* name, const CHFL_PROPERTY* const property) {
+    CHECK_POINTER(residue);
+    CHECK_POINTER(name);
+    CHECK_POINTER(property);
+    CHFL_ERROR_CATCH(
+        residue->set(name, *property);
+    )
+}
+
+extern "C" CHFL_PROPERTY* chfl_residue_get_property(const CHFL_RESIDUE* const residue, const char* name) {
+    CHFL_PROPERTY* property = nullptr;
+    CHECK_POINTER_GOTO(residue);
+    CHECK_POINTER_GOTO(name);
+    CHFL_ERROR_GOTO(
+        auto residue_property = residue->get(name);
+        if (residue_property) {
+            property = shared_allocator::make_shared<Property>(*residue_property);
+        } else {
+            throw property_error("can not find a property named '{}' in this residue", name);
+        }
+    )
+    return property;
+error:
+    chfl_free(property);
+    return nullptr;
 }

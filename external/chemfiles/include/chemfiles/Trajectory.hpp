@@ -7,13 +7,16 @@
 #include <memory>
 #include <string>
 
+#include "chemfiles/exports.h"
 #include "chemfiles/Frame.hpp"
-#include "chemfiles/exports.hpp"
+#include "chemfiles/UnitCell.hpp"
+#include "chemfiles/external/span.hpp"  // IWYU pragma: keep
 #include "chemfiles/external/optional.hpp"
 
 namespace chemfiles {
-
 class Format;
+class Topology;
+class MemoryBuffer;
 
 /// A `Trajectory` is a chemistry file on the hard drive. It is the entry point
 /// of the chemfiles library.
@@ -21,12 +24,27 @@ class CHFL_EXPORT Trajectory final {
 public:
     /// Open a file, automatically gessing the file format from the extension.
     ///
-    /// The format can either be guessed from the extention (".xyz" is XYZ,
-    /// ".gro" is GROMACS, *etc.*), or specified as the third parameter. The
-    /// format names are given in the corresponding [documentation section](
-    /// http://chemfiles.org/chemfiles/latest/formats.html#list-of-supported-formats)
+    /// The `format` parameter should be a string formatted as `"<format>"`,
+    /// `"<format>/<compression>"` or `"/<compression>"`. `<format>` should be
+    /// the format name (see the corresponding [documentation section][formats]
+    /// for the names) or an empty string. `<compression>` should be `GZ` for
+    /// gzip files, `BZ2` for bzip2 files, or `XZ` for lzma/.xz files. If
+    /// `<compression>` is present, it will determine which compression method
+    /// is used to read/write the file.
     ///
-    /// @example{tests/doc/trajectory/trajectory.cpp}
+    /// For example, `format = "XYZ"` will force usage of XYZ format regardless
+    /// of the file extension; `format = "XYZ / GZ"` will additionally use gzip
+    /// compression; and ` format = "/ GZ"` will use the gzip compression, and
+    /// the file extension to guess the format.
+    ///
+    /// If the `format` is an empty string, the file extension will be used
+    /// to guess the format. If `<compression>` is NOT present and the file path
+    /// ends with `.gz`, `.xz`, or `.bz2`; the file will be treated as a
+    /// compressed file and the next extension is used to guess the format. For
+    /// example `Trajectory("file.xyz.gz")` will open the file for reading
+    /// using the XYZ format and the gzip compression method.
+    ///
+    /// @example{trajectory/trajectory.cpp}
     ///
     /// @param path The file path. In `w` or `a` modes, the file is
     ///             created if it does not exist yet. In `r` mode, an
@@ -42,7 +60,44 @@ public:
     /// @throws FileError for all errors concerning the physical file: can not
     ///                   open it, can not read/write it, *etc.*
     /// @throws FormatError if the file is not valid for the used format.
-    Trajectory(std::string path, char mode = 'r', const std::string& format = "");
+    ///
+    /// [formats]: http://chemfiles.org/chemfiles/latest/formats.html#list-of-supported-formats
+    explicit Trajectory(std::string path, char mode = 'r', const std::string& format = "");
+
+    /// Read a memory buffer as though it were a formatted file
+    ///
+    /// The `format` parameter should be follow the same rules as in the main
+    /// `Trajectory` constructor.
+    ///
+    /// @example{trajectory/memory_reader.cpp}
+    ///
+    /// @param data The start of the memory buffer used to store the file.
+    ///             It does not need to be *null* terminated.
+    /// @param size The size of the memory buffer.
+    /// @param format Specific format to use.
+    ///
+    /// @throws FileError If the compression given in `format` is not supported
+    /// @throws FormatError if the data in the buffer is not valid for the used
+    ///                     format, or the format does not support reading from
+    ///                     a memory buffer
+    static Trajectory memory_reader(const char* data, size_t size, const std::string& format);
+
+    /// Write to a memory buffer as though it were a formatted file
+    ///
+    /// The `format` parameter should be follow the same rules as in the main
+    /// `Trajectory` constructor, except that compression specification are not
+    /// supported.
+    ///
+    /// To retreive the memory written to by the returned `Trajectory` object,
+    /// make a call to the `memory_buffer` function.
+    ///
+    /// @example{trajectory/memory_writer.cpp}
+    ///
+    /// @param format Specific format to use.
+    ///
+    /// @throws FileError If any compression is given in `format`
+    /// @throws FormatError if the format does not support writing to a memory buffer
+    static Trajectory memory_writer(const std::string& format);
 
     ~Trajectory();
 
@@ -54,13 +109,13 @@ public:
 
     /// Read the next frame in the trajectory.
     ///
-    /// The trajectory must have been opened in read (`'r'`) or append (`'a'`)
-    /// mode, and the underlying format must support reading.
+    /// The trajectory must have been opened in read mode, and the
+    /// underlying format must support reading.
     ///
     /// This function throws a `FileError` if there are no more frames to read
     /// in the trajectory.
     ///
-    /// @example{tests/doc/trajectory/read.cpp}
+    /// @example{trajectory/read.cpp}
     ///
     /// @throws FileError for all errors concerning the physical file: can not
     ///                   open it, can not read/write it, *etc.*
@@ -70,13 +125,13 @@ public:
 
     /// Read a single frame at specified `step` from the trajectory.
     ///
-    /// The trajectory must have been opened in read (`'r'`) or append (`'a'`)
-    /// mode, and the underlying format must support reading.
+    /// The trajectory must have been opened in read mode, and the
+    /// underlying format must support reading.
     ///
     /// This function throws a `FileError` if the step is bigger than the
     /// number of steps in the trajectory.
     ///
-    /// @example{tests/doc/trajectory/read_step.cpp}
+    /// @example{trajectory/read_step.cpp}
     ///
     /// @param step step to read from the trajectory
     ///
@@ -88,10 +143,10 @@ public:
 
     /// Write a single frame to the trajectory.
     ///
-    /// The trajectory must have been opened in write (`'w'`) or append (`'a'`)
-    /// mode, and the underlying format must support writing.
+    /// The trajectory must have been opened in write or append mode, and the
+    /// underlying format must support reading.
     ///
-    /// @example{tests/doc/trajectory/write.cpp}
+    /// @example{trajectory/write.cpp}
     ///
     /// @param frame frame to write to this trajectory
     ///
@@ -109,7 +164,7 @@ public:
     /// This is mainly usefull when a format does not define topological
     /// information, as it can be the case with some molecular dynamic formats.
     ///
-    /// @example{tests/doc/trajectory/set_topology.cpp}
+    /// @example{trajectory/set_topology.cpp}
     ///
     /// @param topology the topology to use with this frame
     ///
@@ -126,7 +181,7 @@ public:
     /// This is mainly usefull when a format does not define topological
     /// information, as it can be the case with some molecular dynamic formats.
     ///
-    /// @example{tests/doc/trajectory/set_topology.cpp}
+    /// @example{trajectory/set_topology.cpp}
     ///
     /// @param filename trajectory file path.
     /// @param format Specific format to use. Needed when there is no way to
@@ -146,33 +201,51 @@ public:
     /// This replace any unit cell in the file being read, or in the `Frame`
     /// being written.
     ///
-    /// This is mainly usefull when a format does not define unti cell
+    /// This is mainly usefull when a format does not define unit cell
     /// information.
     ///
     /// @param cell the unit cell to use with this frame
     ///
-    /// @example{tests/doc/trajectory/set_cell.cpp}
+    /// @example{trajectory/set_cell.cpp}
     void set_cell(const UnitCell& cell);
 
     /// Get the number of steps (the number of frames) in this trajectory.
     ///
-    /// @example{tests/doc/trajectory/nsteps.cpp}
+    /// @example{trajectory/nsteps.cpp}
     size_t nsteps() const;
 
     /// Check if all the frames in this trajectory have been read, *i.e.* if
     /// the last read frame is the last frame of the trajectory.
     ///
-    /// @example{tests/doc/trajectory/done.cpp}
+    /// @example{trajectory/done.cpp}
     bool done() const;
 
     /// Close a trajectory, and synchronize all buffered content with the drive.
     ///
     /// Calling any function on a closed trajectory will throw a `FileError`.
     ///
-    /// @example{tests/doc/trajectory/close.cpp}
+    /// @example{trajectory/close.cpp}
     void close();
 
+    /// Get the path used to open the trajectory
+    ///
+    /// @example{trajectory/path.cpp}
+    const std::string& path() const {
+        return path_;
+    }
+
+    /// Get the memory buffer used for writing if the trajectory was created
+    /// with `Trajectory::memory_writer`.
+    ///
+    /// If the trajectory was not created for writing to memory, this will
+    /// return `nullopt`.
+    ///
+    /// @example{trajectory/memory_buffer.cpp}
+    optional<span<const char>> memory_buffer() const;
+
 private:
+    Trajectory(char mode, std::unique_ptr<Format> format, std::shared_ptr<MemoryBuffer> buffer);
+
     /// Perform a few checks before reading a frame
     void pre_read(size_t step);
     /// Set the frame topology and/or cell after reading it
@@ -184,11 +257,11 @@ private:
     /// Path of the associated file
     std::string path_;
     /// Opening mode of the associated file
-    char mode_;
+    char mode_ = '\0';
     /// Current step
-    size_t step_;
+    size_t step_ = 0;
     /// Number of steps in the file, if available
-    size_t nsteps_;
+    size_t nsteps_ = 0;
     /// Format used to read the associated file. It will be `nullptr` is the
     /// trajectory is closed
     std::unique_ptr<Format> format_;
@@ -198,6 +271,8 @@ private:
     /// UnitCell to use for reading/writing files when no unit cell information
     /// is present
     optional<UnitCell> custom_cell_;
+    /// The internal memory buffer, shared with the MemoryFile implementation
+    std::shared_ptr<MemoryBuffer> buffer_;
 };
 
 } // namespace chemfiles

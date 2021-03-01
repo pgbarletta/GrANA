@@ -4,7 +4,11 @@
 #ifndef CHEMFILES_CHFL_TRAJECTORY_H
 #define CHEMFILES_CHFL_TRAJECTORY_H
 
+#include <stdint.h>
+
 #include "chemfiles/capi/types.h"
+#include "chemfiles/exports.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -16,7 +20,7 @@ extern "C" {
 /// The caller of this function should free the allocated memory using
 /// `chfl_trajectory_close`.
 ///
-/// @example{tests/capi/doc/chfl_trajectory/open.c}
+/// @example{capi/chfl_trajectory/open.c}
 /// @return A pointer to the trajectory, or NULL in case of error.
 ///         You can use `chfl_last_error` to learn about the error.
 CHFL_EXPORT CHFL_TRAJECTORY* chfl_trajectory_open(const char* path, char mode);
@@ -33,11 +37,54 @@ CHFL_EXPORT CHFL_TRAJECTORY* chfl_trajectory_open(const char* path, char mode);
 /// The caller of this function should free the allocated memory using
 /// `chfl_trajectory_close`.
 ///
-/// @example{tests/capi/doc/chfl_trajectory/with_format.c}
+/// @example{capi/chfl_trajectory/with_format.c}
 /// @return A pointer to the trajectory, or NULL in case of error.
 ///         You can use `chfl_last_error` to learn about the error.
 CHFL_EXPORT CHFL_TRAJECTORY* chfl_trajectory_with_format(
     const char* path, char mode, const char* format
+);
+
+/// Read a memory buffer as though it were a formatted file
+///
+/// The start of the memory buffer used to store the file is given using the
+/// `data` argument and the size of the buffer is given by `size`.
+/// The `format` parameter is required and may contain a compression method.
+///
+/// The caller of this function should free the allocated memory using
+/// `chfl_trajectory_close`.
+///
+/// @example{capi/chfl_trajectory/memory_reader.c}
+/// @return A pointer to the trajectory, or NULL in case of error.
+///         You can use `chfl_last_error` to learn about the error.
+CHFL_EXPORT CHFL_TRAJECTORY* chfl_trajectory_memory_reader(
+    const char* memory, uint64_t size, const char* format
+);
+
+/// Write to a memory buffer as though it were a formatted file
+///
+/// The `format` parameter is required. To retreive the memory written to by
+/// the `CHFL_TRAJECTORY`, use the function `chfl_trajectory_memory_buffer`.
+///
+/// The caller of this function should free the allocated memory using
+/// `chfl_trajectory_close`.
+///
+/// @example{capi/chfl_trajectory/memory_writer.c}
+/// @return A pointer to the trajectory, or NULL in case of error.
+///         You can use `chfl_last_error` to learn about the error.
+CHFL_EXPORT CHFL_TRAJECTORY* chfl_trajectory_memory_writer(
+    const char* format
+);
+
+/// Get the path used to open the `trajectory` in the `path` buffer.
+///
+/// The buffer size must be passed in `buffsize`. This function will truncate
+/// the selection string to fit in the buffer.
+///
+/// @example{capi/chfl_trajectory/path.c}
+/// @return The operation status code. You can use `chfl_last_error` to learn
+///         about the error if the status code is not `CHFL_SUCCESS`.
+CHFL_EXPORT chfl_status chfl_trajectory_path(
+    const CHFL_TRAJECTORY* trajectory, char* path, uint64_t buffsize
 );
 
 /// Read the next step of the `trajectory` into a `frame`.
@@ -45,7 +92,7 @@ CHFL_EXPORT CHFL_TRAJECTORY* chfl_trajectory_with_format(
 /// If the number of atoms in frame does not correspond to the number of atom
 /// in the next step, the frame is resized.
 ///
-/// @example{tests/capi/doc/chfl_trajectory/read.c}
+/// @example{capi/chfl_trajectory/read.c}
 /// @return The operation status code. You can use `chfl_last_error` to learn
 ///         about the error if the status code is not `CHFL_SUCCESS`.
 CHFL_EXPORT chfl_status chfl_trajectory_read(
@@ -57,7 +104,7 @@ CHFL_EXPORT chfl_status chfl_trajectory_read(
 /// If the number of atoms in frame does not correspond to the number of atom
 /// in the step, the frame is resized.
 ///
-/// @example{tests/capi/doc/chfl_trajectory/read_step.c}
+/// @example{capi/chfl_trajectory/read_step.c}
 /// @return The operation status code. You can use `chfl_last_error` to learn
 ///         about the error if the status code is not `CHFL_SUCCESS`.
 CHFL_EXPORT chfl_status chfl_trajectory_read_step(
@@ -66,7 +113,7 @@ CHFL_EXPORT chfl_status chfl_trajectory_read_step(
 
 /// Write a single `frame` to the `trajectory`.
 ///
-/// @example{tests/capi/doc/chfl_trajectory/write.c}
+/// @example{capi/chfl_trajectory/write.c}
 /// @return The operation status code. You can use `chfl_last_error` to learn
 ///         about the error if the status code is not `CHFL_SUCCESS`.
 CHFL_EXPORT chfl_status chfl_trajectory_write(
@@ -77,7 +124,7 @@ CHFL_EXPORT chfl_status chfl_trajectory_write(
 /// used when reading and writing the files, replacing any topology in the
 /// frames or files.
 ///
-/// @example{tests/capi/doc/chfl_trajectory/set_topology.c}
+/// @example{capi/chfl_trajectory/set_topology.c}
 /// @return The operation status code. You can use `chfl_last_error` to learn
 ///         about the error if the status code is not `CHFL_SUCCESS`.
 CHFL_EXPORT chfl_status chfl_trajectory_set_topology(
@@ -91,7 +138,7 @@ CHFL_EXPORT chfl_status chfl_trajectory_set_topology(
 /// If `format` is an empty string or `NULL`, the format will be guessed from
 /// the path extension.
 ///
-/// @example{tests/capi/doc/chfl_trajectory/topology_file.c}
+/// @example{capi/chfl_trajectory/topology_file.c}
 /// @return The operation status code. You can use `chfl_last_error` to learn
 ///         about the error if the status code is not `CHFL_SUCCESS`.
 CHFL_EXPORT chfl_status chfl_trajectory_topology_file(
@@ -101,7 +148,7 @@ CHFL_EXPORT chfl_status chfl_trajectory_topology_file(
 /// Set the unit `cell` associated with a `trajectory`. This cell will be used
 /// when reading and writing the files, replacing any pre-existing unit cell.
 ///
-/// @example{tests/capi/doc/chfl_trajectory/set_cell.c}
+/// @example{capi/chfl_trajectory/set_cell.c}
 /// @return The operation status code. You can use `chfl_last_error` to learn
 ///         about the error if the status code is not `CHFL_SUCCESS`.
 CHFL_EXPORT chfl_status chfl_trajectory_set_cell(
@@ -111,11 +158,25 @@ CHFL_EXPORT chfl_status chfl_trajectory_set_cell(
 /// Store the number of steps (the number of frames) from the `trajectory` in
 /// `nsteps`.
 ///
-/// @example{tests/capi/doc/chfl_trajectory/nsteps.c}
+/// @example{capi/chfl_trajectory/nsteps.c}
 /// @return The operation status code. You can use `chfl_last_error` to learn
 ///         about the error if the status code is not `CHFL_SUCCESS`.
 CHFL_EXPORT chfl_status chfl_trajectory_nsteps(
     CHFL_TRAJECTORY* trajectory, uint64_t* nsteps
+);
+
+/// Obtain the memory buffer written to by the `trajectory`.
+///
+/// The user is **not** responsible for freeing `data` and this will be done
+/// automatically when the trajectory is closed. It is guaranteed that `data` is
+/// null terminated, and the size of the buffer, **not including** the final
+/// `NULL` character, is passed in `size`
+///
+/// @example{capi/chfl_trajectory/memory_buffer.c}
+/// @return The operation status code. You can use `chfl_last_error` to learn
+///         about the error if the status code is not `CHFL_SUCCESS`.
+CHFL_EXPORT chfl_status chfl_trajectory_memory_buffer(
+    const CHFL_TRAJECTORY* trajectory, const char** data, uint64_t* size
 );
 
 /// Close a trajectory file, and free the associated memory.
@@ -123,9 +184,8 @@ CHFL_EXPORT chfl_status chfl_trajectory_nsteps(
 /// Closing a file will synchronize all changes made to the file with the
 /// storage (hard drive, network, ...) used for this file.
 ///
-/// @example{tests/capi/doc/chfl_trajectory/open.c}
-/// @return `CHFL_SUCCESS`
-CHFL_EXPORT chfl_status chfl_trajectory_close(CHFL_TRAJECTORY* trajectory);
+/// @example{capi/chfl_trajectory/open.c}
+CHFL_EXPORT void chfl_trajectory_close(const CHFL_TRAJECTORY* trajectory);
 
 #ifdef __cplusplus
 }

@@ -5,8 +5,8 @@
 #define CHEMFILES_UNIT_CELL_HPP
 
 #include "chemfiles/types.hpp"
-#include "chemfiles/exports.hpp"
-#include "chemfiles/config.hpp"
+#include "chemfiles/exports.h"
+#include "chemfiles/config.h"  // IWYU pragma: keep
 
 #ifdef CHEMFILES_WINDOWS
 #undef INFINITE
@@ -14,20 +14,31 @@
 
 namespace chemfiles {
 
+namespace private_details {
+    /// check if a single value is close enough to zero to be considered equal
+    /// to zero, in the context of unit cell matrices
+    bool is_roughly_zero(double value);
+
+    /// check if a single value is close enough to 90 to be considered equal
+    /// to 90, in the context of unit cell matrices
+    bool is_roughly_90(double value);
+
+    /// check if a matrix is diagonal according to `is_roughly_zero`
+    bool is_diagonal(const Matrix3D& matrix);
+
+    /// check if a matrix is an upper triangular matrix according to
+    /// `is_roughly_zero`
+    bool is_upper_triangular(const Matrix3D& matrix);
+}
+
 /// An UnitCell represent the box containing the atoms, and its periodicity
 ///
-/// A unit cell is fully represented by three lengths (a, b, c); and three angles
-/// (alpha, beta, gamma). The angles are stored in degrees, and the lengths in
-/// Angstroms.
-///
-/// A cell also has a matricial representation, by projecting the three base
-/// vector into an orthonormal base. We choose to represent such matrix as an
-/// upper triangular matrix:
-///
+/// A unit cell is represented by the cell matrix, containing the three cell
+/// vectors:
 /// ```
 /// | a_x   b_x   c_x |
-/// |  0    b_y   c_y |
-/// |  0     0    c_z |
+/// | a_y   b_y   c_y |
+/// | a_z   b_z   c_z |
 /// ```
 class CHFL_EXPORT UnitCell final {
 public:
@@ -44,161 +55,115 @@ public:
     ~UnitCell() = default;
     UnitCell(const UnitCell& other) = default;
     UnitCell& operator=(const UnitCell& other) = default;
-    UnitCell(UnitCell&& other) = default;
-    UnitCell& operator=(UnitCell&& other) = default;
+    UnitCell(UnitCell&& other) noexcept = default;
+    UnitCell& operator=(UnitCell&& other) noexcept = default;
 
     /// Construct an `INFINITE` unit cell, with all lengths set to 0
     ///
-    /// @example{tests/doc/cell/cell-0.cpp}
+    /// @example{cell/cell-0.cpp}
     UnitCell();
 
-    /// Construct a cubic unit cell of side size `a`
+    /// Construct an `ORTHORHOMBIC` unit cell with the given cell `lengths`
     ///
-    /// @example{tests/doc/cell/cell-1.cpp}
-    UnitCell(double a);
+    /// @example{cell/cell-1.cpp}
+    UnitCell(Vector3D lengths);
 
-    /// Construct an `ORTHOROMBIC` unit cell of side size `a`, `b`, `c`
+    /// Construct a unit cell with the given cell `lengths` and `angles`
     ///
-    /// @example{tests/doc/cell/cell-3.cpp}
-    UnitCell(double a, double b, double c);
+    /// If all lengths are set to 0, then the cell is `INFINITE`. If at least
+    /// one length is not zero and all angles are 90.0, then the cell is
+    /// `ORTHORHOMBIC`.  Else a `TRICLINIC` cell is created.
+    ///
+    /// @example{cell/cell-2.cpp}
+    UnitCell(Vector3D lengths, Vector3D angles);
 
-    /// Construct an unit cell of side size `a`, `b`, `c`, and cell angles
-    /// `alpha`, `beta`, `gamma`.
+    /// Construct a unit cell from a cell matrix.
     ///
-    /// If all of `alpha`, `beta` and `gamma` are 90.0, then the cell is
-    /// `ORTHOROMBIC`. Else a `TRICLINIC` cell is created.
+    /// If `matrix` contains only zeros, then an infinite cell is created. If
+    /// only the diagonal of the matrix is non-zero, then the cell is
+    /// `ORTHORHOMBIC`.  Else a `TRICLINIC` cell is created. The matrix entries
+    /// should be in Angstroms.
     ///
-    /// @example{tests/doc/cell/cell-6.cpp}
-    UnitCell(double a, double b, double c, double alpha, double beta, double gamma);
+    /// @example{cell/cell-matrix.cpp}
+    UnitCell(Matrix3D matrix);
 
-    /// Get the cell matrix, defined as the upper triangular matrix
+    /// Get the cell matrix
     ///
-    /// ```
-    /// | a_x   b_x   c_x |
-    /// |  0    b_y   c_y |
-    /// |  0     0    c_z |
-    /// ```
-    ///
-    /// @example{tests/doc/cell/matrix.cpp}
+    /// @example{cell/matrix.cpp}
     Matrix3D matrix() const {
-        return h_;
+        return matrix_;
     }
 
     /// Get the cell shape
     ///
-    /// @example{tests/doc/cell/shape.cpp}
-    CellShape shape() const { return shape_; }
+    /// @example{cell/shape.cpp}
+    CellShape shape() const {
+        return shape_;
+    }
 
     /// Set the cell shape to `shape`
     ///
-    /// @example{tests/doc/cell/shape.cpp}
-    ///
+    /// @example{cell/shape.cpp}
     /// @throws Error if `shape` is `ORTHORHOMBIC` and some angles are not 90°,
     ///         or if `shape` is `INFINITE` and some lengths are not 0.0.
     void set_shape(CellShape shape);
 
-    /// Get the first lenght (a) of the cell
+    /// Get the lengths of the cell's vectors, in angstroms.
     ///
-    /// @example{tests/doc/cell/lengths.cpp}
-    double a() const { return a_; }
+    /// @example{cell/lengths.cpp}
+    Vector3D lengths() const;
 
-    /// Set the first lenght (a) of the cell
+    /// Get the angles between the cell's vectors in degrees
     ///
-    /// @example{tests/doc/cell/lengths.cpp}
+    /// @example{cell/angles.cpp}
+    Vector3D angles() const;
+
+    /// Set the lengths of the cell's vectors. The values should be in angstroms.
     ///
+    /// **This function reset cell orientation!**
+    ///
+    /// After the call, the cell is aligned such that the first cell vector is
+    /// along the *x* axis, and the second cell vector is in the *xy* plane.
+    ///
+    /// @example{cell/lengths.cpp}
     /// @throws Error if the cell shape is `INFINITE`.
-    void set_a(double val);
+    void set_lengths(Vector3D lengths);
 
-    /// Get the second lenght (b) of the cell
+    /// Set the angles between the cell's vectors. The values should be in degrees.
     ///
-    /// @example{tests/doc/cell/lengths.cpp}
-    double b() const { return b_; }
-
-    /// Set the second lenght (b) of the cell
+    /// **This function reset cell orientation!**
     ///
-    /// @example{tests/doc/cell/lengths.cpp}
+    /// After the call, the cell is aligned such that the first cell vector is
+    /// along the *x* axis, and the second cell vector is in the *xy* plane.
     ///
-    /// @throws Error if the cell shape is `INFINITE`.
-    void set_b(double val);
-
-    /// Get the third lenght (c) of the cell
-    ///
-    /// @example{tests/doc/cell/lengths.cpp}
-    double c() const { return c_; }
-
-    /// Set the third lenght (c) of the cell
-    ///
-    /// @example{tests/doc/cell/lengths.cpp}
-    ///
-    /// @throws Error if the cell shape is `INFINITE`.
-    void set_c(double val);
-
-    /// Get the first angle (alpha) of the cell
-    ///
-    /// @example{tests/doc/cell/angles.cpp}
-    double alpha() const { return alpha_; }
-
-    /// Set the first angle (alpha) of the cell
-    ///
-    /// @example{tests/doc/cell/angles.cpp}
-    ///
+    /// @example{cell/angles.cpp}
     /// @throws Error if the cell shape is not `TRICLINIC`.
-    void set_alpha(double val);
-
-    /// Get the second angle (beta) of the cell
-    ///
-    /// @example{tests/doc/cell/angles.cpp}
-    double beta() const { return beta_; }
-
-    /// Set the second angle (beta) of the cell if possible
-    ///
-    /// @example{tests/doc/cell/angles.cpp}
-    ///
-    /// @throws Error if the cell shape is not `TRICLINIC`.
-    void set_beta(double val);
-
-    /// Get the third angle (gamma) of the cell
-    ///
-    /// @example{tests/doc/cell/angles.cpp}
-    double gamma() const { return gamma_; }
-
-    /// Set the third angle (gamma) of the cell if possible
-    ///
-    /// @example{tests/doc/cell/angles.cpp}
-    ///
-    /// @throws Error if the cell shape is not `TRICLINIC`.
-    void set_gamma(double val);
+    void set_angles(Vector3D angles);
 
     /// Get the unit cell volume
     ///
-    /// @example{tests/doc/cell/volume.cpp}
+    /// @example{cell/volume.cpp}
     double volume() const;
 
     /// Wrap the `vector` in the unit cell, using periodic boundary conditions.
     ///
-    /// For an orthorombic unit cell, this make sure that all the vector
+    /// For an orthorhombic unit cell, this make sure that all the vector
     /// components are between `-L/2` and `L/2` where `L` is the corresponding
     /// cell length.
     ///
-    /// @example{tests/doc/cell/wrap.cpp}
+    /// @example{cell/wrap.cpp}
     Vector3D wrap(const Vector3D& vector) const;
 
 private:
-    /// Wrap a vector in orthorombic cell
-    Vector3D wrap_orthorombic(const Vector3D& vector) const;
+    /// Wrap a vector in orthorhombic cell
+    Vector3D wrap_orthorhombic(const Vector3D& vector) const;
     /// Wrap a vector in triclinic cell
     Vector3D wrap_triclinic(const Vector3D& vector) const;
-    /// Compute the cell matrix from the cell parameters
-    void update_matrix();
-    /// Caching the cell matrix
-    Matrix3D h_;
-    /// Caching the inverse of the cell matrix
-    Matrix3D h_inv_;
 
-    /// Cell lengths
-    double a_, b_, c_;
-    /// Cell angles
-    double alpha_, beta_, gamma_;
+    /// Cell matrix
+    Matrix3D matrix_;
+    /// Caching the inverse of the cell matrix
+    Matrix3D matrix_inv_;
     /// Cell type
     CellShape shape_;
 };

@@ -9,6 +9,46 @@
 constexpr double PI = 3.14159265358979323846;
 
 TEST_CASE("chfl_frame") {
+    SECTION("Constructors errors") {
+        fail_next_allocation();
+        CHECK(chfl_frame() == nullptr);
+
+        CHFL_FRAME* frame = chfl_frame();
+        REQUIRE(frame);
+
+        fail_next_allocation();
+        CHECK(chfl_frame_copy(frame) == nullptr);
+
+        chfl_free(frame);
+    }
+
+    SECTION("copy") {
+        CHFL_FRAME* frame = chfl_frame();
+        REQUIRE(frame);
+        CHECK_STATUS(chfl_frame_resize(frame, 4));
+
+        CHFL_FRAME* copy = chfl_frame_copy(frame);
+        REQUIRE(copy);
+
+        uint64_t natoms = 0;
+        CHECK_STATUS(chfl_frame_atoms_count(frame, &natoms));
+        CHECK(natoms == 4);
+
+        CHECK_STATUS(chfl_frame_atoms_count(copy, &natoms));
+        CHECK(natoms == 4);
+
+        CHECK_STATUS(chfl_frame_resize(frame, 22));
+
+        CHECK_STATUS(chfl_frame_atoms_count(frame, &natoms));
+        CHECK(natoms == 22);
+
+        CHECK_STATUS(chfl_frame_atoms_count(copy, &natoms));
+        CHECK(natoms == 4);
+
+        chfl_free(copy);
+        chfl_free(frame);
+    }
+
     SECTION("Size") {
         CHFL_FRAME* frame = chfl_frame();
         REQUIRE(frame);
@@ -25,7 +65,7 @@ TEST_CASE("chfl_frame") {
         CHECK_STATUS(chfl_frame_atoms_count(frame, &natoms));
         CHECK(natoms == 3);
 
-        CHECK_STATUS(chfl_frame_free(frame));
+        chfl_free(frame);
     }
 
     SECTION("Step") {
@@ -40,7 +80,7 @@ TEST_CASE("chfl_frame") {
         CHECK_STATUS(chfl_frame_step(frame, &step));
         CHECK(step == 42);
 
-        CHECK_STATUS(chfl_frame_free(frame));
+        chfl_free(frame);
     }
 
     SECTION("Positions") {
@@ -49,7 +89,7 @@ TEST_CASE("chfl_frame") {
         CHECK_STATUS(chfl_frame_resize(frame, 4));
 
         uint64_t natoms = 0;
-        chfl_vector3d* positions = NULL;
+        chfl_vector3d* positions = nullptr;
         CHECK_STATUS(chfl_frame_positions(frame, &positions, &natoms));
         CHECK(natoms == 4);
 
@@ -59,15 +99,15 @@ TEST_CASE("chfl_frame") {
             }
         }
 
-        positions = NULL;
+        positions = nullptr;
         CHECK_STATUS(chfl_frame_positions(frame, &positions, &natoms));
         for (size_t i=0; i<natoms; i++) {
             for (size_t j=0; j<3; j++) {
-                CHECK(positions[i][j] == i * j);
+                CHECK(positions[i][j] == static_cast<double>(i * j));
             }
         }
 
-        CHECK_STATUS(chfl_frame_free(frame));
+        chfl_free(frame);
     }
 
     SECTION("Velocities") {
@@ -83,7 +123,7 @@ TEST_CASE("chfl_frame") {
         CHECK(has_velocities == true);
 
         uint64_t natoms = 0;
-        chfl_vector3d* velocities = NULL;
+        chfl_vector3d* velocities = nullptr;
         CHECK_STATUS(chfl_frame_velocities(frame, &velocities, &natoms));
         CHECK(natoms == 4);
 
@@ -93,15 +133,15 @@ TEST_CASE("chfl_frame") {
             }
         }
 
-        velocities = NULL;
+        velocities = nullptr;
         CHECK_STATUS(chfl_frame_velocities(frame, &velocities, &natoms));
         for (size_t i=0; i<natoms; i++) {
             for (size_t j=0; j<3; j++) {
-                CHECK(velocities[i][j] == i * j + 1);
+                CHECK(velocities[i][j] == static_cast<double>(i * j + 1));
             }
         }
 
-        CHECK_STATUS(chfl_frame_free(frame));
+        chfl_free(frame);
     }
 
     SECTION("Unit cell") {
@@ -122,14 +162,14 @@ TEST_CASE("chfl_frame") {
         CHECK_STATUS(chfl_cell_shape(cell, &shape));
         CHECK(shape == CHFL_CELL_INFINITE);
 
-        CHECK_STATUS(chfl_cell_free(cell));
+        chfl_free(cell);
 
         // Setting an unit cell
         lengths[0] = 3; lengths[1] = 4; lengths[2] = 5;
-        cell = chfl_cell(lengths);
+        cell = chfl_cell(lengths, nullptr);
         REQUIRE(cell);
         CHECK_STATUS(chfl_frame_set_cell(frame, cell));
-        CHECK_STATUS(chfl_cell_free(cell));
+        chfl_free(cell);
 
         cell = chfl_cell_from_frame(frame);
         REQUIRE(cell);
@@ -142,8 +182,8 @@ TEST_CASE("chfl_frame") {
         CHECK_STATUS(chfl_cell_shape(cell, &shape));
         CHECK(shape == CHFL_CELL_ORTHORHOMBIC);
 
-        CHECK_STATUS(chfl_cell_free(cell));
-        CHECK_STATUS(chfl_frame_free(frame));
+        chfl_free(cell);
+        chfl_free(frame);
     }
 
     SECTION("Add atoms") {
@@ -158,15 +198,15 @@ TEST_CASE("chfl_frame") {
 
         CHFL_ATOM* atom = chfl_atom("U");
         chfl_vector3d position = {2, 3, 4};
-        CHECK_STATUS(chfl_frame_add_atom(frame, atom, position, NULL));
+        CHECK_STATUS(chfl_frame_add_atom(frame, atom, position, nullptr));
         chfl_vector3d velocity = {1, 2, 1};
         CHECK_STATUS(chfl_frame_add_atom(frame, atom, position, velocity));
-        CHECK_STATUS(chfl_atom_free(atom));
+        chfl_free(atom);
 
         CHECK_STATUS(chfl_frame_atoms_count(frame, &natoms));
         CHECK(natoms == 2);
 
-        chfl_vector3d* positions = NULL;
+        chfl_vector3d* positions = nullptr;
         CHECK_STATUS(chfl_frame_positions(frame, &positions, &natoms));
         CHECK(natoms == 2);
         CHECK(positions[0][0] == 2);
@@ -177,7 +217,7 @@ TEST_CASE("chfl_frame") {
         CHECK(positions[1][1] == 3);
         CHECK(positions[1][2] == 4);
 
-        chfl_vector3d* velocities = NULL;
+        chfl_vector3d* velocities = nullptr;
         CHECK_STATUS(chfl_frame_velocities(frame, &velocities, &natoms));
         CHECK(natoms == 2);
 
@@ -189,7 +229,7 @@ TEST_CASE("chfl_frame") {
         CHECK(velocities[1][1] == 2);
         CHECK(velocities[1][2] == 1);
 
-        CHECK_STATUS(chfl_frame_free(frame));
+        chfl_free(frame);
     }
 
     SECTION("Topology") {
@@ -209,29 +249,54 @@ TEST_CASE("chfl_frame") {
         CHECK_STATUS(chfl_topology_add_atom(topology, Ar));
         CHECK_STATUS(chfl_topology_add_atom(topology, Zn));
         CHECK_STATUS(chfl_topology_add_atom(topology, Ar));
-        CHECK_STATUS(chfl_atom_free(Zn));
-        CHECK_STATUS(chfl_atom_free(Ar));
+        chfl_free(Zn);
+        chfl_free(Ar);
 
         CHECK_STATUS(chfl_frame_set_topology(frame, topology));
-        CHECK_STATUS(chfl_topology_free(topology));
+        chfl_free(topology);
 
-        topology = chfl_topology_from_frame(frame);
-        REQUIRE(topology);
+        const CHFL_TOPOLOGY* check_topology = chfl_topology_from_frame(frame);
+        REQUIRE(check_topology);
 
         uint64_t natoms = 0;
-        CHECK_STATUS(chfl_topology_atoms_count(topology, &natoms));
+        CHECK_STATUS(chfl_topology_atoms_count(check_topology, &natoms));
         CHECK(natoms == 4);
 
-        CHFL_ATOM* atom = chfl_atom_from_topology(topology, 1);
-        REQUIRE(atom);
+        chfl_free(check_topology);
+        chfl_free(frame);
+    }
 
-        char name[32] = {0};
-        CHECK_STATUS(chfl_atom_name(atom, name, sizeof(name)));
-        CHECK(name == std::string("Ar"));
+    SECTION("Change topology") {
+        CHFL_FRAME* frame = chfl_frame();
+        REQUIRE(frame);
+        CHECK_STATUS(chfl_frame_resize(frame, 4));
 
-        CHECK_STATUS(chfl_atom_free(atom));
-        CHECK_STATUS(chfl_topology_free(topology));
-        CHECK_STATUS(chfl_frame_free(frame));
+        const CHFL_TOPOLOGY* topology = chfl_topology_from_frame(frame);
+        REQUIRE(topology);
+
+        uint64_t nbonds = 0;
+        CHECK_STATUS(chfl_topology_bonds_count(topology, &nbonds));
+        CHECK(nbonds == 0);
+
+        CHFL_TOPOLOGY* new_topology = chfl_topology();
+        REQUIRE(new_topology);
+        CHECK_STATUS(chfl_topology_resize(new_topology, 4));
+        CHECK_STATUS(chfl_topology_add_bond(new_topology, 1, 2));
+        CHECK_STATUS(chfl_topology_add_bond(new_topology, 3, 2));
+
+        CHECK_STATUS(chfl_frame_set_topology(frame, new_topology));
+        chfl_free(new_topology);
+
+        // Topology changed, but its address did not
+        CHECK_STATUS(chfl_topology_bonds_count(topology, &nbonds));
+        CHECK(nbonds == 2);
+
+        CHECK_STATUS(chfl_frame_clear_bonds(frame));
+        CHECK_STATUS(chfl_topology_bonds_count(topology, &nbonds));
+        CHECK(nbonds == 0);
+
+        chfl_free(topology);
+        chfl_free(frame);
     }
 
     SECTION("Get atoms") {
@@ -245,13 +310,21 @@ TEST_CASE("chfl_frame") {
         char name[32] = {0};
         CHECK_STATUS(chfl_atom_name(atom, name, sizeof(name)));
         CHECK(name == std::string(""));
-        CHECK_STATUS(chfl_atom_free(atom));
+        chfl_free(atom);
+
+        // Get the same atom twice
+        CHFL_ATOM* first = chfl_atom_from_frame(frame, 1);
+        CHFL_ATOM* second = chfl_atom_from_frame(frame, 1);
+        REQUIRE(first);
+        REQUIRE(second);
+        chfl_free(first);
+        chfl_free(second);
 
         // Out of bounds access
         atom = chfl_atom_from_frame(frame, 10000);
         CHECK_FALSE(atom);
 
-        CHECK_STATUS(chfl_frame_free(frame));
+        chfl_free(frame);
     }
 
     SECTION("Guess topology") {
@@ -259,16 +332,16 @@ TEST_CASE("chfl_frame") {
         REQUIRE(trajectory);
 
         chfl_vector3d lengths = {30, 30, 30};
-        CHFL_CELL* cell = chfl_cell(lengths);
+        CHFL_CELL* cell = chfl_cell(lengths, nullptr);
         CHECK_STATUS(chfl_trajectory_set_cell(trajectory, cell));
-        CHECK_STATUS(chfl_cell_free(cell));
+        chfl_free(cell);
 
         CHFL_FRAME* frame = chfl_frame();
         REQUIRE(frame);
         CHECK_STATUS(chfl_trajectory_read(trajectory, frame));
 
-        CHECK_STATUS(chfl_frame_guess_topology(frame));
-        CHFL_TOPOLOGY* topology = chfl_topology_from_frame(frame);
+        CHECK_STATUS(chfl_frame_guess_bonds(frame));
+        const CHFL_TOPOLOGY* topology = chfl_topology_from_frame(frame);
         REQUIRE(topology);
 
         uint64_t n = 0;
@@ -281,9 +354,9 @@ TEST_CASE("chfl_frame") {
         CHECK_STATUS(chfl_topology_dihedrals_count(topology, &n));
         CHECK(n == 0);
 
-        CHECK_STATUS(chfl_topology_free(topology));
-        CHECK_STATUS(chfl_frame_free(frame));
-        CHECK_STATUS(chfl_trajectory_close(trajectory));
+        chfl_free(topology);
+        chfl_free(frame);
+        chfl_trajectory_close(trajectory);
     }
 
     SECTION("PBC distance, angles and dihedrals") {
@@ -293,15 +366,15 @@ TEST_CASE("chfl_frame") {
         REQUIRE(atom);
 
         chfl_vector3d position_1 = {1, 0, 0};
-        CHECK_STATUS(chfl_frame_add_atom(frame, atom, position_1, NULL));
+        CHECK_STATUS(chfl_frame_add_atom(frame, atom, position_1, nullptr));
         chfl_vector3d position_2 = {0, 0, 0};
-        CHECK_STATUS(chfl_frame_add_atom(frame, atom, position_2, NULL));
+        CHECK_STATUS(chfl_frame_add_atom(frame, atom, position_2, nullptr));
         chfl_vector3d position_3 = {0, 1, 0};
-        CHECK_STATUS(chfl_frame_add_atom(frame, atom, position_3, NULL));
+        CHECK_STATUS(chfl_frame_add_atom(frame, atom, position_3, nullptr));
         chfl_vector3d position_4 = {0, 1, 1};
-        CHECK_STATUS(chfl_frame_add_atom(frame, atom, position_4, NULL));
+        CHECK_STATUS(chfl_frame_add_atom(frame, atom, position_4, nullptr));
         chfl_vector3d position_5 = {0, 0, 2};
-        CHECK_STATUS(chfl_frame_add_atom(frame, atom, position_5, NULL));
+        CHECK_STATUS(chfl_frame_add_atom(frame, atom, position_5, nullptr));
 
         double distance = 0;
         CHECK_STATUS(chfl_frame_distance(frame, 0, 2, &distance));
@@ -325,8 +398,8 @@ TEST_CASE("chfl_frame") {
         CHECK(chfl_frame_dihedral(frame, 0, 6, 2, 3, &distance) == CHFL_OUT_OF_BOUNDS);
         CHECK(chfl_frame_out_of_plane(frame, 0, 6, 2, 3, &distance) == CHFL_OUT_OF_BOUNDS);
 
-        CHECK_STATUS(chfl_atom_free(atom));
-        CHECK_STATUS(chfl_frame_free(frame));
+        chfl_free(atom);
+        chfl_free(frame);
     }
 
     SECTION("Property") {
@@ -337,18 +410,38 @@ TEST_CASE("chfl_frame") {
         REQUIRE(property);
 
         CHECK_STATUS(chfl_frame_set_property(frame, "this", property));
-        CHECK_STATUS(chfl_property_free(property));
+        chfl_free(property);
         property = nullptr;
 
         property = chfl_frame_get_property(frame, "this");
         double value = 0;
         CHECK_STATUS(chfl_property_get_double(property, &value));
         CHECK(value == -23);
+        chfl_free(property);
 
         CHECK_FALSE(chfl_frame_get_property(frame, "that"));
 
-        CHECK_STATUS(chfl_property_free(property));
-        CHECK_STATUS(chfl_frame_free(frame));
+        property = chfl_property_bool(false);
+        REQUIRE(property);
+
+        CHECK_STATUS(chfl_frame_set_property(frame, "that", property));
+        chfl_free(property);
+
+        uint64_t count = 0;
+        CHECK_STATUS(chfl_frame_properties_count(frame, &count));
+        CHECK(count == 2);
+
+        const char* names[2] = {nullptr};
+        CHECK_STATUS(chfl_frame_list_properties(frame, names, count));
+        // There are no guarantee of ordering
+        if (names[0] == std::string("this")) {
+            CHECK(names[1] == std::string("that"));
+        } else {
+            CHECK(names[0] == std::string("that"));
+            CHECK(names[1] == std::string("this"));
+        }
+
+        chfl_free(frame);
     }
 
     SECTION("Bonds") {
@@ -358,9 +451,9 @@ TEST_CASE("chfl_frame") {
         CHECK_STATUS(chfl_frame_resize(frame, 4));
         CHECK_STATUS(chfl_frame_add_bond(frame, 0, 1));
         CHECK_STATUS(chfl_frame_add_bond(frame, 0, 2));
-        CHECK_STATUS(chfl_frame_add_bond(frame, 0, 3));
+        CHECK_STATUS(chfl_frame_bond_with_order(frame, 0, 3, CHFL_BOND_TRIPLE));
 
-        CHFL_TOPOLOGY* topology = chfl_topology_from_frame(frame);
+        const CHFL_TOPOLOGY* topology = chfl_topology_from_frame(frame);
         REQUIRE(topology);
 
         uint64_t n = 0;
@@ -376,10 +469,14 @@ TEST_CASE("chfl_frame") {
             }
         }
 
+        chfl_bond_order bond_order;
+        chfl_topology_bond_order(topology, 0, 3, &bond_order);
+        CHECK(bond_order == CHFL_BOND_TRIPLE);
+
         CHECK_STATUS(chfl_frame_remove_bond(frame, 0, 2));
 
         // We need to get a new copy of the topology
-        CHECK_STATUS(chfl_topology_free(topology));
+        chfl_free(topology);
         topology = chfl_topology_from_frame(frame);
         REQUIRE(topology);
 
@@ -395,8 +492,11 @@ TEST_CASE("chfl_frame") {
             }
         }
 
-        CHECK_STATUS(chfl_topology_free(topology));
-        CHECK_STATUS(chfl_frame_free(frame));
+        chfl_topology_bond_order(topology, 0, 3, &bond_order);
+        CHECK(bond_order == CHFL_BOND_TRIPLE);
+
+        chfl_free(topology);
+        chfl_free(frame);
     }
 
     SECTION("Residues") {
@@ -407,17 +507,17 @@ TEST_CASE("chfl_frame") {
             CHFL_RESIDUE* residue = chfl_residue("X");
             REQUIRE(residue);
             CHECK_STATUS(chfl_frame_add_residue(frame, residue));
-            CHECK_STATUS(chfl_residue_free(residue));
+            chfl_free(residue);
         }
 
-        CHFL_TOPOLOGY* topology = chfl_topology_from_frame(frame);
+        const CHFL_TOPOLOGY* topology = chfl_topology_from_frame(frame);
         REQUIRE(topology);
 
         uint64_t count = 0;
         CHECK_STATUS(chfl_topology_residues_count(topology, &count));
         CHECK(count == 3);
 
-        CHECK_STATUS(chfl_topology_free(topology));
-        CHECK_STATUS(chfl_frame_free(frame));
+        chfl_free(topology);
+        chfl_free(frame);
     }
 }

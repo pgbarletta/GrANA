@@ -6,9 +6,9 @@
 #include "chemfiles.hpp"
 using namespace chemfiles;
 
-TEST_CASE("Read files in DCD format using Molfile"){
+TEST_CASE("Read files in DCD format using Molfile") {
     double eps = 1e-4;
-    Trajectory file("data/dcd/water.dcd");
+    auto file = Trajectory("data/dcd/water.dcd");
 
     auto frame = file.read();
     CHECK(frame.size() == 297);
@@ -19,10 +19,9 @@ TEST_CASE("Read files in DCD format using Molfile"){
 
     auto cell = frame.cell();
     CHECK(cell.shape() == UnitCell::ORTHORHOMBIC);
-    CHECK(fabs(cell.a() - 15.0) < eps);
+    CHECK(cell.lengths() == Vector3D(15.0, 15.0, 15.0));
 
-    file.read(); // Skip a frame
-    frame = file.read();
+    frame = file.read_step(2);
     CHECK(frame.size() == 297);
 
     positions = frame.positions();

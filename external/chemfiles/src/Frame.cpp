@@ -1,19 +1,34 @@
 // Chemfiles, a modern library for chemistry file reading and writing
 // Copyright (C) Guillaume Fraux and contributors -- BSD license
 
+#include <cassert>
+#include <cstddef>
+#include <cmath>
+#include <string>
+#include <vector>
+#include <iterator>
 #include <algorithm>
+#include <unordered_map>
 
-#include "chemfiles/ErrorFmt.hpp"
+#include "chemfiles/types.hpp"
+#include "chemfiles/error_fmt.hpp"
+#include "chemfiles/periodic_table.hpp"
+#include "chemfiles/external/optional.hpp"
+
+#include "chemfiles/Atom.hpp"
+#include "chemfiles/Topology.hpp"
+#include "chemfiles/UnitCell.hpp"
+#include "chemfiles/Connectivity.hpp"
+#include "chemfiles/Configuration.hpp"
+
 #include "chemfiles/Frame.hpp"
+
 using namespace chemfiles;
 
-Frame::Frame() : Frame(Topology()) {}
+// get radius compatible with VMD bond guessing algorithm
+static optional<double> guess_bonds_radius(const Atom& atom);
 
-Frame::Frame(Topology topology, UnitCell cell):
-    topology_(std::move(topology)), cell_(cell)
-{
-    resize(topology_.size());
-}
+Frame::Frame(UnitCell cell): cell_(std::move(cell)) {} // NOLINT: std::move for trivially copyable type
 
 size_t Frame::size() const {
     assert(positions_.size() == topology_.size());
@@ -45,28 +60,28 @@ void Frame::add_velocities() {
     }
 }
 
-void Frame::guess_topology() {
+void Frame::guess_bonds() {
     topology_.clear_bonds();
     // This bond guessing algorithm comes from VMD
     auto cutoff = 0.833;
     for (size_t i = 0; i < size(); i++) {
-        auto rad = topology_[i].vdw_radius().value_or(0);
+        auto rad = guess_bonds_radius(topology_[i]).value_or(0);
         cutoff = std::max(cutoff, rad);
     }
     cutoff = 1.2 * cutoff;
 
     for (size_t i = 0; i < size(); i++) {
-        auto i_radius = topology_[i].vdw_radius();
+        auto i_radius = guess_bonds_radius(topology_[i]);
         if (!i_radius) {
             throw error(
-                "Missing Van der Waals radius for '{}'", topology_[i].type()
+                "missing Van der Waals radius for '{}'", topology_[i].type()
             );
         }
         for (size_t j = i + 1; j < size(); j++) {
-            auto j_radius = topology_[j].vdw_radius();
+            auto j_radius = guess_bonds_radius(topology_[j]);
             if (!j_radius) {
                 throw error(
-                    "Missing Van der Waals radius for '{}'", topology_[j].type()
+                    "missing Van der Waals radius for '{}'", topology_[j].type()
                 );
             }
             auto d = distance(i, j);
@@ -109,7 +124,7 @@ void Frame::guess_topology() {
 void Frame::set_topology(Topology topology) {
     if (topology.size() != size()) {
         throw error(
-            "The topology contains {} atoms, but the frame contains {} atoms.",
+            "the topology contains {} atoms, but the frame contains {} atoms",
             topology.size(), size()
         );
     }
@@ -203,13 +218,37 @@ double Frame::out_of_plane(size_t i, size_t j, size_t k, size_t m) const {
     auto rim = cell_.wrap(positions_[i] - positions_[m]);
 
     auto n = cross(rik, rim);
-    return dot(rji, n) / n.norm();
+    auto n_norm = n.norm();
+    if (n_norm < 1e-12) {
+        // if i, k, and m are colinear, then j is always inside the plane
+        return 0;
+    } else {
+        return dot(rji, n) / n_norm;
+    }
 }
 
-void Frame::set(std::string name, Property value) {
-    properties_.set(std::move(name), std::move(value));
-}
+const std::unordered_map<std::string, double> BOND_GUESSING_RADII = {
+    {"H", 1.0},
+    {"C", 1.5},
+    {"O", 1.3},
+    {"N", 1.4},
+    {"S", 1.9},
+    {"F", 1.2},
+};
 
-optional<const Property&> Frame::get(const std::string& name) const {
-    return properties_.get(name);
+optional<double> guess_bonds_radius(const Atom& atom) {
+    const auto& type = atom.type();
+    auto it = BOND_GUESSING_RADII.find(type);
+    if (it != BOND_GUESSING_RADII.end()) {
+        // allow configuration file to override data from BOND_GUESSING_RADII
+        auto user_config = Configuration::atom_data(type);
+        if (user_config && user_config->vdw_radius) {
+            return user_config->vdw_radius.value();
+        } else {
+            return it->second;
+        }
+    } else {
+        // default to chemfiles provided atom type
+        return atom.vdw_radius();
+    }
 }

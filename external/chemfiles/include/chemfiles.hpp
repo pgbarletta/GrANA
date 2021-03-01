@@ -4,9 +4,11 @@
 #ifndef CHEMFILES_HPP
 #define CHEMFILES_HPP
 
-#include "chemfiles/config.hpp"
-#include "chemfiles/exports.hpp"
-#include "chemfiles/generic.hpp"
+#include "chemfiles/exports.h"
+#include "chemfiles/config.h"
+
+#include "chemfiles/misc.hpp"
+#include "chemfiles/FormatMetadata.hpp"
 
 #include "chemfiles/Error.hpp"
 #include "chemfiles/Property.hpp"
@@ -16,6 +18,6 @@
 #include "chemfiles/Residue.hpp"
 #include "chemfiles/Trajectory.hpp"
 #include "chemfiles/UnitCell.hpp"
-#include "chemfiles/Selections.hpp"
+#include "chemfiles/Selection.hpp"
 
 #endif // CHEMFILES_HPP

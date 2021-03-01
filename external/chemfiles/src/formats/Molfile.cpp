@@ -2,12 +2,33 @@
 #define VMDCON_WARN      2
 #define VMDCON_ERROR     3
 
+extern "C" {
+    #include <vmdplugin.h>
+    #include <molfile_plugin.h>
+}
+
+#include <cassert>
+#include <cstdint>
+#include <array>
+#include <string>
+#include <vector>
+#include <unordered_map>
+
+#include "chemfiles/types.hpp"
+#include "chemfiles/warnings.hpp"
+#include "chemfiles/error_fmt.hpp"
+#include "chemfiles/external/span.hpp"
+#include "chemfiles/external/optional.hpp"
+
+#include "chemfiles/File.hpp"
+#include "chemfiles/Atom.hpp"
+#include "chemfiles/Frame.hpp"
+#include "chemfiles/Residue.hpp"
+#include "chemfiles/Topology.hpp"
+#include "chemfiles/FormatMetadata.hpp"
+
 #include "chemfiles/formats/Molfile.hpp"
 
-#include "chemfiles/Frame.hpp"
-#include "chemfiles/ErrorFmt.hpp"
-#include "chemfiles/warnings.hpp"
-#include "chemfiles/Topology.hpp"
 using namespace chemfiles;
 
 /******************************************************************************/
@@ -29,12 +50,8 @@ using namespace chemfiles;
 
 namespace chemfiles {
     PLUGINS_DATA(DCD,               dcdplugin,          dcd,            false);
-    PLUGINS_DATA(GRO,               gromacsplugin,      gro,            false);
-    PLUGINS_DATA(TRR,               gromacsplugin,      trr,            false);
-    PLUGINS_DATA(XTC,               gromacsplugin,      xtc,            false);
     PLUGINS_DATA(TRJ,               gromacsplugin,      trj,            false);
     PLUGINS_DATA(LAMMPS,            lammpsplugin,       lammpstrj,      true);
-    PLUGINS_DATA(MOL2,              mol2plugin,         mol2,           false);
     PLUGINS_DATA(MOLDEN,            moldenplugin,       molden,         false);
 }
 
@@ -57,7 +74,7 @@ template <MolfileFormat F> static int register_plugin(void* user_data, vmdplugin
 
 static int molfiles_to_chemfiles_warning(int level, const char* message) {
     if (level == VMDCON_ERROR || level == VMDCON_WARN) {
-        warning(message);
+        send_warning(message);
     }
     return 0;
 }
@@ -65,11 +82,17 @@ static int molfiles_to_chemfiles_warning(int level, const char* message) {
 /******************************************************************************/
 
 template <MolfileFormat F>
-Molfile<F>::Molfile(const std::string& path, File::Mode mode)
-    : path_(path), plugin_handle_(nullptr), data_(nullptr), natoms_(0) {
+Molfile<F>::Molfile(std::string path, File::Mode mode, File::Compression compression)
+    : path_(std::move(path)), plugin_handle_(nullptr), data_(nullptr), natoms_(0) {
     if (mode != File::READ) {
         throw format_error(
             "molfiles based format {} is only available in read mode", plugin_data_.format()
+        );
+    }
+
+    if (compression != File::DEFAULT) {
+        throw format_error(
+            "molfiles based format {} do not support compression", plugin_data_.format()
         );
     }
 
@@ -91,28 +114,28 @@ Molfile<F>::Molfile(const std::string& path, File::Mode mode)
     plugin_handle_->cons_fputs = molfiles_to_chemfiles_warning;
 
     // Check that needed functions are here
-    if (!plugin_handle_->open_file_read ||
-        (!plugin_handle_->read_next_timestep && !plugin_handle_->read_timestep) ||
-        (!plugin_handle_->close_file_read)) {
+    if (plugin_handle_->open_file_read == nullptr ||
+        (plugin_handle_->read_next_timestep == nullptr && plugin_handle_->read_timestep == nullptr ) ||
+        (plugin_handle_->close_file_read == nullptr )) {
         throw format_error(
             "the {} plugin does not have read capacities", plugin_data_.format()
         );
     }
 
     data_ = plugin_handle_->open_file_read(
-        path.c_str(), plugin_handle_->name, &natoms_
+        path_.c_str(), plugin_handle_->name, &natoms_
     );
 
-    if (!data_) {
+    if (data_ == nullptr) {
         throw format_error(
-            "could not open the file at '{}' with {} plugin", path, plugin_data_.format()
+            "could not open the file at '{}' with {} plugin", path_, plugin_data_.format()
         );
     }
 
     read_topology();
 }
 
-template <MolfileFormat F> Molfile<F>::~Molfile() noexcept {
+template <MolfileFormat F> Molfile<F>::~Molfile() {
     if (data_) {
         plugin_handle_->close_file_read(data_);
     }
@@ -120,10 +143,10 @@ template <MolfileFormat F> Molfile<F>::~Molfile() noexcept {
 }
 
 template <MolfileFormat F> int Molfile<F>::read_next_timestep(molfile_timestep_t* timestep) {
-    if (plugin_handle_->read_next_timestep) {
+    if (plugin_handle_->read_next_timestep != nullptr) {
         // This function is provided by classical molecular simulation format.
         return plugin_handle_->read_next_timestep(data_, natoms_, timestep);
-    } else if (plugin_handle_->read_timestep) {
+    } else if (plugin_handle_->read_timestep != nullptr) {
         // This function is provided by quantum molecular simulation format.
         return plugin_handle_->read_timestep(
             data_, natoms_, timestep, nullptr, nullptr
@@ -140,7 +163,7 @@ template <MolfileFormat F> void Molfile<F>::read(Frame& frame) {
     std::vector<float> coords(3 * static_cast<size_t>(natoms_));
     std::vector<float> velocities(0);
 
-    molfile_timestep_t timestep{nullptr, nullptr, 0, 0, 0, 0, 0, 0, 0};
+    molfile_timestep_t timestep{nullptr, nullptr, 0, 0, 0, 90, 90, 90, 0};
     timestep.coords = coords.data();
     if (plugin_data_.have_velocities()) {
         velocities.resize(3 * static_cast<size_t>(natoms_));
@@ -160,13 +183,23 @@ template <MolfileFormat F> void Molfile<F>::read(Frame& frame) {
         frame.set_topology(*topology_);
     }
     molfile_to_frame(timestep, frame);
+
+    frames_.emplace_back(frame.clone());
+}
+
+template <MolfileFormat F> void Molfile<F>::read_step(size_t step, Frame& frame) {
+    while (step >= frames_.size()) {
+        Frame new_frame;
+        this->read(new_frame);
+    }
+    frame = frames_.at(step).clone();
 }
 
 template <MolfileFormat F> size_t Molfile<F>::nsteps() {
-    if (!plugin_handle_->read_next_timestep) {
+    if (plugin_handle_->read_next_timestep == nullptr) {
         // FIXME: this is hacky, but the molden plugin does not respect a NULL
         // argument for molfile_timestep_t, so for now we are only able to read
-        // a sinle step from all the QM format plugins.
+        // a single step from all the QM format plugins.
         return 1;
     }
     size_t n = 0;
@@ -181,35 +214,42 @@ template <MolfileFormat F> size_t Molfile<F>::nsteps() {
     }
     // We need to close and re-open the file
     plugin_handle_->close_file_read(data_);
-    int tmp = 0;
-    data_ = plugin_handle_->open_file_read(path_.c_str(), plugin_handle_->name, &tmp);
+    int unused = 0;
+    data_ = plugin_handle_->open_file_read(path_.c_str(), plugin_handle_->name, &unused);
     read_topology();
 
     return n;
 }
 
 template <MolfileFormat F>
-void Molfile<F>::molfile_to_frame(const molfile_timestep_t& timestep,
-                                  Frame& frame) {
-    auto cell = UnitCell(timestep.A, timestep.B, timestep.C, timestep.alpha,
-                         timestep.beta, timestep.gamma);
-    frame.set_cell(cell);
+void Molfile<F>::molfile_to_frame(const molfile_timestep_t& timestep, Frame& frame) {
+    auto lengths = Vector3D(
+        static_cast<double>(timestep.A),
+        static_cast<double>(timestep.B),
+        static_cast<double>(timestep.C)
+    );
+    auto angles = Vector3D(
+        static_cast<double>(timestep.alpha),
+        static_cast<double>(timestep.beta),
+        static_cast<double>(timestep.gamma)
+    );
+    frame.set_cell({lengths, angles});
 
     frame.resize(static_cast<size_t>(natoms_));
     auto positions = frame.positions();
     for (size_t i = 0; i < static_cast<size_t>(natoms_); i++) {
-        positions[i][0] = timestep.coords[3 * i];
-        positions[i][1] = timestep.coords[3 * i + 1];
-        positions[i][2] = timestep.coords[3 * i + 2];
+        positions[i][0] = static_cast<double>(timestep.coords[3 * i + 0]);
+        positions[i][1] = static_cast<double>(timestep.coords[3 * i + 1]);
+        positions[i][2] = static_cast<double>(timestep.coords[3 * i + 2]);
     }
 
     if (plugin_data_.have_velocities()) {
         frame.add_velocities();
         auto velocities = frame.velocities();
         for (size_t i = 0; i < static_cast<size_t>(natoms_); i++) {
-            (*velocities)[i][0] = timestep.velocities[3 * i];
-            (*velocities)[i][1] = timestep.velocities[3 * i + 1];
-            (*velocities)[i][2] = timestep.velocities[3 * i + 2];
+            (*velocities)[i][0] = static_cast<double>(timestep.velocities[3 * i + 0]);
+            (*velocities)[i][1] = static_cast<double>(timestep.velocities[3 * i + 1]);
+            (*velocities)[i][2] = static_cast<double>(timestep.velocities[3 * i + 2]);
         }
     }
 }
@@ -231,22 +271,22 @@ template <MolfileFormat F> void Molfile<F>::read_topology() {
 
     topology_ = Topology();
 
-    auto residues = std::unordered_map<size_t, Residue>();
+    auto residues = std::unordered_map<int64_t, Residue>();
     size_t atom_id = 0;
-    for (auto& vmd_atom : atoms) {
-        Atom atom(vmd_atom.name, vmd_atom.type);
-        if (optflags & MOLFILE_MASS) {
-            atom.set_mass(vmd_atom.mass);
+    for (auto& molfile_atom : atoms) {
+        Atom atom(molfile_atom.name, molfile_atom.type);
+        if ((optflags & MOLFILE_MASS) != 0) {
+            atom.set_mass(static_cast<double>(molfile_atom.mass));
         }
-        if (optflags & MOLFILE_CHARGE) {
-            atom.set_charge(vmd_atom.charge);
+        if ((optflags & MOLFILE_CHARGE) != 0) {
+            atom.set_charge(static_cast<double>(molfile_atom.charge));
         }
 
         topology_->add_atom(std::move(atom));
 
-        if (vmd_atom.resname != std::string("")) {
-            auto resid = static_cast<size_t>(vmd_atom.resid);
-            auto residue = Residue(vmd_atom.resname, resid);
+        if (molfile_atom.resname != std::string("")) {
+            auto resid = static_cast<int64_t>(molfile_atom.resid);
+            auto residue = Residue(molfile_atom.resname, resid);
             auto inserted = residues.insert({resid, std::move(residue)});
             inserted.first->second.add_atom(atom_id);
         }
@@ -282,60 +322,88 @@ template <MolfileFormat F> void Molfile<F>::read_topology() {
     }
 }
 
-// Instanciate all the templates
+// Instantiate all the templates
 template class chemfiles::Molfile<DCD>;
-template class chemfiles::Molfile<GRO>;
-template class chemfiles::Molfile<TRR>;
-template class chemfiles::Molfile<XTC>;
 template class chemfiles::Molfile<TRJ>;
-template class chemfiles::Molfile<MOL2>;
 template class chemfiles::Molfile<LAMMPS>;
 template class chemfiles::Molfile<MOLDEN>;
 
-template<> FormatInfo chemfiles::format_information<Molfile<DCD>>() {
-    return FormatInfo("DCD").with_extension(".dcd").description(
-        "DCD binary format"
-    );
+template<> const FormatMetadata& chemfiles::format_metadata<Molfile<DCD>>() {
+    static FormatMetadata metadata;
+    metadata.name = "DCD";
+    metadata.extension = ".dcd";
+    metadata.description = "DCD binary format";
+    metadata.reference = "http://www.ks.uiuc.edu/Research/vmd/plugins/molfile/dcdplugin.html";
+
+    metadata.read = true;
+    metadata.write = false;
+    metadata.memory = false;
+
+    metadata.positions = true;
+    metadata.velocities = false;
+    metadata.unit_cell = false;
+    metadata.atoms = false;
+    metadata.bonds = false;
+    metadata.residues = false;
+    return metadata;
 }
 
-template<> FormatInfo chemfiles::format_information<Molfile<GRO>>() {
-    return FormatInfo("GRO").with_extension(".gro").description(
-        "GROMACS .gro text format"
-    );
+template<> const FormatMetadata& chemfiles::format_metadata<Molfile<TRJ>>() {
+    static FormatMetadata metadata;
+    metadata.name = "TRJ";
+    metadata.extension = ".trj";
+    metadata.description = "GROMACS .trj binary format";
+    metadata.reference = "http://manual.gromacs.org/archive/5.0.7/online/trj.html";
+
+    metadata.read = true;
+    metadata.write = false;
+    metadata.memory = false;
+
+    metadata.positions = true;
+    metadata.velocities = false;
+    metadata.unit_cell = false;
+    metadata.atoms = false;
+    metadata.bonds = false;
+    metadata.residues = false;
+    return metadata;
 }
 
-template<> FormatInfo chemfiles::format_information<Molfile<TRR>>() {
-    return FormatInfo("TRR").with_extension(".trr").description(
-        "GROMACS .trr binary portable format"
-    );
+template<> const FormatMetadata& chemfiles::format_metadata<Molfile<LAMMPS>>() {
+    static FormatMetadata metadata;
+    metadata.name = "LAMMPS";
+    metadata.extension = ".lammpstrj";
+    metadata.description = "LAMMPS text trajectory format";
+    metadata.reference = "https://lammps.sandia.gov/doc/dump.html";
+
+    metadata.read = true;
+    metadata.write = false;
+    metadata.memory = false;
+
+    metadata.positions = true;
+    metadata.velocities = false;
+    metadata.unit_cell = false;
+    metadata.atoms = false;
+    metadata.bonds = false;
+    metadata.residues = false;
+    return metadata;
 }
 
-template<> FormatInfo chemfiles::format_information<Molfile<TRJ>>() {
-    return FormatInfo("TRJ").with_extension(".trj").description(
-        "GROMACS .xtc binary format"
-    );
-}
+template<> const FormatMetadata& chemfiles::format_metadata<Molfile<MOLDEN>>() {
+    static FormatMetadata metadata;
+    metadata.name = "Molden";
+    metadata.extension = ".molden";
+    metadata.description = "Molden text format";
+    metadata.reference = "https://web.archive.org/web/20200531080022/http://cheminf.cmbi.ru.nl/molden/molden_format.html";
 
-template<> FormatInfo chemfiles::format_information<Molfile<XTC>>() {
-    return FormatInfo("XTC").with_extension(".xtc").description(
-        "GROMACS .xtc binary compressed portable format"
-    );
-}
+    metadata.read = true;
+    metadata.write = false;
+    metadata.memory = false;
 
-template<> FormatInfo chemfiles::format_information<Molfile<MOL2>>() {
-    return FormatInfo("MOL2").with_extension(".mol2").description(
-        "TRIPOS mol2 text format"
-    );
-}
-
-template<> FormatInfo chemfiles::format_information<Molfile<LAMMPS>>() {
-    return FormatInfo("LAMMPS").with_extension(".lammpstrj").description(
-        "LAMMPS text trajectory format"
-    );
-}
-
-template<> FormatInfo chemfiles::format_information<Molfile<MOLDEN>>() {
-    return FormatInfo("Molden").with_extension(".molden").description(
-        "Molden text format"
-    );
+    metadata.positions = true;
+    metadata.velocities = false;
+    metadata.unit_cell = false;
+    metadata.atoms = true;
+    metadata.bonds = false;
+    metadata.residues = false;
+    return metadata;
 }

@@ -8,6 +8,46 @@
 static CHFL_TOPOLOGY* testing_topology();
 
 TEST_CASE("chfl_topology") {
+    SECTION("Constructors errors") {
+        fail_next_allocation();
+        CHECK(chfl_topology() == nullptr);
+
+        CHFL_TOPOLOGY* topology = chfl_topology();
+        REQUIRE(topology);
+
+        fail_next_allocation();
+        CHECK(chfl_topology_copy(topology) == nullptr);
+
+        chfl_free(topology);
+    }
+
+    SECTION("copy") {
+        CHFL_TOPOLOGY* topology = chfl_topology();
+        REQUIRE(topology);
+        CHECK_STATUS(chfl_topology_resize(topology, 4));
+
+        CHFL_TOPOLOGY* copy = chfl_topology_copy(topology);
+        REQUIRE(copy);
+
+        uint64_t natoms = 0;
+        CHECK_STATUS(chfl_topology_atoms_count(topology, &natoms));
+        CHECK(natoms == 4);
+
+        CHECK_STATUS(chfl_topology_atoms_count(copy, &natoms));
+        CHECK(natoms == 4);
+
+        CHECK_STATUS(chfl_topology_resize(topology, 22));
+
+        CHECK_STATUS(chfl_topology_atoms_count(topology, &natoms));
+        CHECK(natoms == 22);
+
+        CHECK_STATUS(chfl_topology_atoms_count(copy, &natoms));
+        CHECK(natoms == 4);
+
+        chfl_free(copy);
+        chfl_free(topology);
+    }
+
     SECTION("Size") {
         CHFL_TOPOLOGY* topology = chfl_topology();
         REQUIRE(topology);
@@ -20,7 +60,7 @@ TEST_CASE("chfl_topology") {
         CHECK_STATUS(chfl_topology_atoms_count(topology, &natoms));
         CHECK(natoms == 42);
 
-        CHECK_STATUS(chfl_topology_free(topology));
+        chfl_free(topology);
     }
 
     SECTION("Atoms") {
@@ -41,13 +81,13 @@ TEST_CASE("chfl_topology") {
         char name[32];
         CHECK_STATUS(chfl_atom_type(atom, name, sizeof(name)));
         CHECK(name == std::string("H"));
-        CHECK_STATUS(chfl_atom_free(atom));
+        chfl_free(atom);
 
         // Out of bound access
         atom = chfl_atom_from_topology(topology, 10000);
         CHECK_FALSE(atom);
 
-        CHECK_STATUS(chfl_topology_free(topology));
+        chfl_free(topology);
     }
 
     SECTION("Bonds") {
@@ -71,7 +111,11 @@ TEST_CASE("chfl_topology") {
         CHECK_STATUS(chfl_topology_bonds_count(topology, &n));
         CHECK(n == 2);
 
-        CHECK_STATUS(chfl_topology_free(topology));
+        CHECK_STATUS(chfl_topology_clear_bonds(topology));
+        CHECK_STATUS(chfl_topology_bonds_count(topology, &n));
+        CHECK(n == 0);
+
+        chfl_free(topology);
     }
 
     SECTION("Angles") {
@@ -95,7 +139,7 @@ TEST_CASE("chfl_topology") {
         CHECK_STATUS(chfl_topology_angles_count(topology, &n));
         CHECK(n == 1);
 
-        CHECK_STATUS(chfl_topology_free(topology));
+        chfl_free(topology);
     }
 
     SECTION("Dihedrals") {
@@ -117,7 +161,7 @@ TEST_CASE("chfl_topology") {
         CHECK_STATUS(chfl_topology_dihedrals_count(topology, &n));
         CHECK(n == 0);
 
-        CHECK_STATUS(chfl_topology_free(topology));
+        chfl_free(topology);
     }
 
     SECTION("Impropers") {
@@ -128,7 +172,7 @@ TEST_CASE("chfl_topology") {
         REQUIRE(H);
         CHECK_STATUS(chfl_topology_add_atom(topology, H));
         CHECK_STATUS(chfl_topology_add_bond(topology, 2, 4));
-        CHECK_STATUS(chfl_atom_free(H));
+        chfl_free(H);
 
         uint64_t n = 0;
         CHECK_STATUS(chfl_topology_impropers_count(topology, &n));
@@ -145,7 +189,7 @@ TEST_CASE("chfl_topology") {
         CHECK_STATUS(chfl_topology_impropers_count(topology, &n));
         CHECK(n == 0);
 
-        CHECK_STATUS(chfl_topology_free(topology));
+        chfl_free(topology);
     }
 
     SECTION("Residues") {
@@ -156,7 +200,7 @@ TEST_CASE("chfl_topology") {
         for (uint64_t i=0; i<10; i++) {
             CHECK_STATUS(chfl_topology_add_atom(topology, atom));
         }
-        CHECK_STATUS(chfl_atom_free(atom));
+        chfl_free(atom);
 
         uint64_t residues[3][3] = {{2, 3, 6}, {0, 1, 9}, {4, 5, 8}};
         for (uint64_t i=0; i<3; i++) {
@@ -167,19 +211,19 @@ TEST_CASE("chfl_topology") {
             }
 
             CHECK_STATUS(chfl_topology_add_residue(topology, residue));
-            CHECK_STATUS(chfl_residue_free(residue));
+            chfl_free(residue);
         }
 
         uint64_t count = 0;
         CHECK_STATUS(chfl_topology_residues_count(topology, &count));
         CHECK(count == 3);
 
-        CHFL_RESIDUE* first = chfl_residue_for_atom(topology, 2);
-        CHFL_RESIDUE* second = chfl_residue_for_atom(topology, 0);
+        const CHFL_RESIDUE* first = chfl_residue_for_atom(topology, 2);
+        const CHFL_RESIDUE* second = chfl_residue_for_atom(topology, 0);
         REQUIRE(first);
         REQUIRE(second);
 
-        CHFL_RESIDUE* out_of_bounds = chfl_residue_for_atom(topology, 7);
+        const CHFL_RESIDUE* out_of_bounds = chfl_residue_for_atom(topology, 7);
         CHECK_FALSE(out_of_bounds);
 
         bool linked = true;
@@ -190,9 +234,9 @@ TEST_CASE("chfl_topology") {
         CHECK_STATUS(chfl_topology_residues_linked(topology, first, second, &linked));
         CHECK(linked == true);
 
-        CHECK_STATUS(chfl_residue_free(first));
-        CHECK_STATUS(chfl_residue_free(second));
-        CHECK_STATUS(chfl_topology_free(topology));
+        chfl_free(first);
+        chfl_free(second);
+        chfl_free(topology);
     }
 }
 
@@ -210,8 +254,8 @@ static CHFL_TOPOLOGY* testing_topology() {
     CHECK_STATUS(chfl_topology_add_atom(topology, O));
     CHECK_STATUS(chfl_topology_add_atom(topology, H));
 
-    CHECK_STATUS(chfl_atom_free(O));
-    CHECK_STATUS(chfl_atom_free(H));
+    chfl_free(O);
+    chfl_free(H);
 
     CHECK_STATUS(chfl_topology_add_bond(topology, 0, 1));
     CHECK_STATUS(chfl_topology_add_bond(topology, 1, 2));

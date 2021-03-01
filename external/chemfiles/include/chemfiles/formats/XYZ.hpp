@@ -4,31 +4,43 @@
 #ifndef CHEMFILES_FORMAT_XYZ_HPP
 #define CHEMFILES_FORMAT_XYZ_HPP
 
-#include "chemfiles/Format.hpp"
+#include <cstdint>
+#include <string>
+#include <memory>
+
 #include "chemfiles/File.hpp"
+#include "chemfiles/Format.hpp"
+
+#include "chemfiles/external/optional.hpp"
 
 namespace chemfiles {
+class Frame;
+class MemoryBuffer;
+class FormatMetadata;
 
-/// [XYZ] file format reader and writer.
+/// XYZ file format reader and writer.
 ///
-/// [XYZ]: http://openbabel.org/wiki/XYZ
-class XYZFormat final: public Format {
+/// This class also support the extended XYZ specification, as defined in
+/// [ASE](https://wiki.fysik.dtu.dk/ase/ase/io/formatoptions.html#extxyz)
+class XYZFormat final: public TextFormat {
 public:
-    XYZFormat(const std::string& path, File::Mode mode);
+    XYZFormat(std::string path, File::Mode mode, File::Compression compression):
+        TextFormat(std::move(path), mode, compression){}
 
-    void read_step(size_t step, Frame& frame) override;
-    void read(Frame& frame) override;
-    void write(const Frame& frame) override;
-    size_t nsteps() override;
+    XYZFormat(std::shared_ptr<MemoryBuffer> memory, File::Mode mode, File::Compression compression) :
+        TextFormat(std::move(memory), mode, compression){}
+
+    void read_next(Frame& frame) override;
+    void write_next(const Frame& frame) override;
+    optional<uint64_t> forward() override;
+
 private:
-    /// Text file where we read from
-    std::unique_ptr<TextFile> file_;
-    /// Storing the positions of all the steps in the file, so that we can
-    /// just `seekg` them instead of reading the whole step.
-    std::vector<std::streampos> steps_positions_;
+    // used to give better error message in `forward`, this refers to the
+    // current step being checked.
+    size_t current_forward_step_ = 0;
 };
 
-template<> FormatInfo format_information<XYZFormat>();
+template<> const FormatMetadata& format_metadata<XYZFormat>();
 
 } // namespace chemfiles
 

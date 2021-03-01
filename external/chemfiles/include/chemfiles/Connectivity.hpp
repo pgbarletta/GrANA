@@ -5,10 +5,11 @@
 #define CHEMFILES_CONNECTIVITY_HPP
 
 #include <array>
-#include <cassert>
+#include <vector>
+#include <algorithm> // IWYU pragma: keep
 
 #include "chemfiles/sorted_set.hpp"
-#include "chemfiles/exports.hpp"
+#include "chemfiles/exports.h"
 
 namespace chemfiles {
 
@@ -16,17 +17,36 @@ namespace chemfiles {
 ///
 /// This class implements all the comparison operators, as well as indexing.
 ///
-/// @example{tests/doc/connectivity/bond.cpp}
+/// @example{connectivity/bond.cpp}
 class CHFL_EXPORT Bond final {
 public:
+
+    /// Stores the type of bond
+    enum BondOrder {
+        UNKNOWN = 0,    ///< Bond order is unknown or unspecified
+        SINGLE = 1,     ///< Single bond
+        DOUBLE = 2,     ///< Double bond
+        TRIPLE = 3,     ///< Triple bond
+        QUADRUPLE = 4,  ///< Quadruplet bond
+        QUINTUPLET = 5,  ///< Quintuplet bond
+
+        // space for more bond types if needed
+        DOWN = 250,     ///< Single bond direction from first atom to second is 'down'. Used for cis-trans isomers
+        UP = 251,       ///< Single bond direction from first atom to second is 'up'. Used for cis-trans isomers
+        DATIVE_R = 252, ///< Dative bond where the electrons are localized to the first atom
+        DATIVE_L = 253, ///< Dative bond where the electrons are localized to the second atom
+        AMIDE = 254,    ///< Amide bond (C(=O)-NH)
+        AROMATIC = 255, ///< Aromatic bond (for example the ring bonds in benzene)
+    };
+
     /// Create a new `Bond` containing the atoms `i` and `j`.
     ///
     /// @throw Error if `i == j`
     Bond(size_t i, size_t j);
 
     ~Bond() = default;
-    Bond(Bond&&) = default;
-    Bond& operator=(Bond&&) = default;
+    Bond(Bond&&) noexcept = default;
+    Bond& operator=(Bond&&) noexcept = default;
     Bond(const Bond&) = default;
     Bond& operator=(const Bond&) = default;
 
@@ -81,7 +101,7 @@ inline bool operator>=(const Bond& lhs, const Bond& rhs) {
 ///
 /// This class implements all the comparison operators, as well as indexing.
 ///
-/// @example{tests/doc/connectivity/angle.cpp}
+/// @example{connectivity/angle.cpp}
 class CHFL_EXPORT Angle final {
 public:
     /// Create a new `Angle` containing the atoms `i`, `j` and `k`.
@@ -90,8 +110,8 @@ public:
     Angle(size_t i, size_t j, size_t k);
 
     ~Angle() = default;
-    Angle(Angle&&) = default;
-    Angle& operator=(Angle&&) = default;
+    Angle(Angle&&) noexcept = default;
+    Angle& operator=(Angle&&) noexcept = default;
     Angle(const Angle&) = default;
     Angle& operator=(const Angle&) = default;
 
@@ -147,7 +167,7 @@ inline bool operator>=(const Angle& lhs, const Angle& rhs) {
 ///
 /// This class implements all the comparison operators, as well as indexing.
 ///
-/// @example{tests/doc/connectivity/dihedral.cpp}
+/// @example{connectivity/dihedral.cpp}
 class CHFL_EXPORT Dihedral final {
 public:
     /// Create a new `Dihedral` containing the atoms `i`, `j`, `k` and `m`.
@@ -156,8 +176,8 @@ public:
     Dihedral(size_t i, size_t j, size_t k, size_t m);
 
     ~Dihedral() = default;
-    Dihedral(Dihedral&&) = default;
-    Dihedral& operator=(Dihedral&&) = default;
+    Dihedral(Dihedral&&) noexcept = default;
+    Dihedral& operator=(Dihedral&&) noexcept = default;
     Dihedral(const Dihedral&) = default;
     Dihedral& operator=(const Dihedral&) = default;
 
@@ -217,7 +237,7 @@ inline bool operator>=(const Dihedral& lhs, const Dihedral& rhs) {
 ///
 /// The second atom of the improper is always the central atom.
 ///
-/// @example{tests/doc/connectivity/improper.cpp}
+/// @example{connectivity/improper.cpp}
 class CHFL_EXPORT Improper final {
 public:
     /// Create a new `Improper` containing the atoms `i`, `j`, `k` and `m`. `j`
@@ -227,8 +247,8 @@ public:
     Improper(size_t i, size_t j, size_t k, size_t m);
 
     ~Improper() = default;
-    Improper(Improper&&) = default;
-    Improper& operator=(Improper&&) = default;
+    Improper(Improper&&) noexcept = default;
+    Improper& operator=(Improper&&) noexcept = default;
     Improper(const Improper&) = default;
     Improper& operator=(const Improper&) = default;
 
@@ -284,6 +304,9 @@ public:
     /// Get the bonds in this connectivity
     const sorted_set<Bond>& bonds() const;
 
+    /// Get the bond orders in this connectivity
+    const std::vector<Bond::BondOrder>& bond_orders() const;
+
     /// Get the angles in this connectivity
     const sorted_set<Angle>& angles() const;
 
@@ -294,7 +317,7 @@ public:
     const sorted_set<Improper>& impropers() const;
 
     /// Add a bond between the atoms `i` and `j`
-    void add_bond(size_t i, size_t j);
+    void add_bond(size_t i, size_t j, Bond::BondOrder bond_order = Bond::UNKNOWN);
 
     /// Remove any bond between the atoms `i` and `j`
     void remove_bond(size_t i, size_t j);
@@ -305,6 +328,8 @@ public:
     /// bonds/angles/dihedrals/impropers lists by -1.
     void atom_removed(size_t index);
 
+    /// Get the bond order of the bond between i and j
+    Bond::BondOrder bond_order(size_t i, size_t j) const;
 private:
     /// Recalculate the angles and the dihedrals from the bond list
     void recalculate() const;
@@ -322,6 +347,8 @@ private:
     mutable sorted_set<Improper> impropers_;
     /// Is the cached content up to date ?
     mutable bool uptodate_ = false;
+    /// Store the bond orders
+    std::vector<Bond::BondOrder> bond_orders_;
 };
 
 } // namespace chemfiles

@@ -5,7 +5,8 @@
 #define CHEMFILES_SORTED_SET_HPP
 
 #include <vector>
-#include <algorithm>
+#include <utility>    // IWYU pragma: keep
+#include <algorithm>  // IWYU pragma: keep
 
 namespace chemfiles {
 
@@ -25,7 +26,6 @@ public:
     sorted_set(sorted_set&&) = default;
     sorted_set& operator=(sorted_set&&) = default;
 
-    using super::operator[];
     using super::cbegin;
     using super::cend;
     using super::crbegin;
@@ -34,6 +34,8 @@ public:
     const_iterator end() const {return super::end();}
     const_iterator rbegin() const {return super::rbegin();}
     const_iterator rend() const {return super::rend();}
+
+    const T& operator[](size_t i) const {return super::operator[](i);}
 
     using super::empty;
     using super::size;
@@ -85,8 +87,16 @@ public:
         return super::erase(it);
     }
 
-    /// Get the underlying vector data wihtout a copy
+    /// Get the underlying vector data without a copy
     const super& as_vec() const {
+        return *this;
+    }
+
+    /// Get the underlying vector data without a copy.
+    ///
+    /// WARNING: the vector is not const and can be modified, the user is
+    /// supposed to ensure that the values inside stay ordered.
+    super& as_mutable_vec() {
         return *this;
     }
 };

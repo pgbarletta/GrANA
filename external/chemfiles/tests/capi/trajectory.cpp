@@ -1,6 +1,7 @@
 // Chemfiles, a modern library for chemistry file reading and writing
 // Copyright (C) Guillaume Fraux and contributors -- BSD license
 
+#include <cstring>
 #include <fstream>
 #include <sstream>
 
@@ -11,6 +12,25 @@
 static CHFL_FRAME* testing_frame();
 
 TEST_CASE("Read trajectory") {
+    SECTION("Constructors errors") {
+        CHECK(chfl_trajectory_open("not there", 'r') == nullptr);
+        CHECK(chfl_trajectory_with_format("not there", 'r', "") == nullptr);
+
+        // Not technically constructors, but close enough
+        CHECK(chfl_trajectory_memory_reader("not there", 5, "") == nullptr);
+    }
+
+    SECTION("Path") {
+        CHFL_TRAJECTORY* trajectory = chfl_trajectory_open("data/xyz/water.xyz", 'r');
+        REQUIRE(trajectory);
+
+        char path[256] = {0};
+        CHECK_STATUS(chfl_trajectory_path(trajectory, path, sizeof(path)));
+        CHECK(std::string(path) == "data/xyz/water.xyz");
+
+        chfl_trajectory_close(trajectory);
+    }
+
     SECTION("Number of steps") {
         CHFL_TRAJECTORY* trajectory = chfl_trajectory_open("data/xyz/water.xyz", 'r');
         REQUIRE(trajectory);
@@ -19,7 +39,7 @@ TEST_CASE("Read trajectory") {
         CHECK_STATUS(chfl_trajectory_nsteps(trajectory, &nsteps));
         CHECK(nsteps == 100);
 
-        CHECK_STATUS(chfl_trajectory_close(trajectory));
+        chfl_trajectory_close(trajectory);
     }
 
     SECTION("Open with format") {
@@ -34,8 +54,24 @@ TEST_CASE("Read trajectory") {
         CHECK_STATUS(chfl_frame_atoms_count(frame, &natoms));
         CHECK(natoms == 125);
 
-        CHECK_STATUS(chfl_frame_free(frame));
-        CHECK_STATUS(chfl_trajectory_close(trajectory));
+        chfl_free(frame);
+        chfl_trajectory_close(trajectory);
+    }
+
+    SECTION("Open memory for reading") {
+        CHFL_TRAJECTORY* trajectory = chfl_trajectory_memory_reader("c1ccccc1", 9, "SMI");
+        CHFL_FRAME* frame = chfl_frame();
+        REQUIRE(trajectory);
+        REQUIRE(frame);
+
+        CHECK_STATUS(chfl_trajectory_read(trajectory, frame));
+
+        uint64_t natoms = 0;
+        CHECK_STATUS(chfl_frame_atoms_count(frame, &natoms));
+        CHECK(natoms == 6);
+
+        chfl_free(frame);
+        chfl_trajectory_close(trajectory);
     }
 
     SECTION("Read next step") {
@@ -50,23 +86,23 @@ TEST_CASE("Read trajectory") {
         CHECK_STATUS(chfl_frame_atoms_count(frame, &natoms));
         CHECK(natoms == 297);
 
-        chfl_vector3d* data = NULL;
+        chfl_vector3d* positions = nullptr;
         // Check for the error when requesting non-existent velocities
-        CHECK(chfl_frame_velocities(frame, &data, &natoms) != CHFL_SUCCESS);
+        CHECK(chfl_frame_velocities(frame, &positions, &natoms) != CHFL_SUCCESS);
 
         chfl_vector3d positions_0 = {0.417219, 8.303366, 11.737172};
         chfl_vector3d positions_124 = {5.099554, -0.045104, 14.153846};
 
         // Check positions in the first frame
-        CHECK_STATUS(chfl_frame_positions(frame, &data, &natoms));
+        CHECK_STATUS(chfl_frame_positions(frame, &positions, &natoms));
         CHECK(natoms == 297);
-        for (unsigned i=0; i<3; i++){
-            CHECK(data[0][i] == positions_0[i]);
-            CHECK(data[124][i] == positions_124[i]);
+        for (unsigned i=0; i<3; i++) {
+            CHECK(approx_eq(positions[0][i], positions_0[i], 1e-12));
+            CHECK(approx_eq(positions[124][i], positions_124[i], 1e-12));
         }
 
-        CHECK_STATUS(chfl_frame_free(frame));
-        CHECK_STATUS(chfl_trajectory_close(trajectory));
+        chfl_free(frame);
+        chfl_trajectory_close(trajectory);
     }
 
     SECTION("Read specific step") {
@@ -84,16 +120,16 @@ TEST_CASE("Read trajectory") {
         chfl_vector3d positions_0 = {0.761277, 8.106125, 10.622949};
         chfl_vector3d positions_124 = {5.13242, 0.079862, 14.194161};
 
-        chfl_vector3d* positions = NULL;
+        chfl_vector3d* positions = nullptr;
         CHECK_STATUS(chfl_frame_positions(frame, &positions, &natoms));
         CHECK(natoms == 297);
-        for (unsigned i=0; i<3; i++){
-            CHECK(positions[0][i] == positions_0[i]);
-            CHECK(positions[124][i] == positions_124[i]);
+        for (unsigned i=0; i<3; i++) {
+            CHECK(approx_eq(positions[0][i], positions_0[i], 1e-12));
+            CHECK(approx_eq(positions[124][i], positions_124[i], 1e-12));
         }
 
-        CHECK_STATUS(chfl_frame_free(frame));
-        CHECK_STATUS(chfl_trajectory_close(trajectory));
+        chfl_free(frame);
+        chfl_trajectory_close(trajectory);
     }
 
     SECTION("Get topology") {
@@ -104,7 +140,7 @@ TEST_CASE("Read trajectory") {
 
         CHECK_STATUS(chfl_trajectory_read(trajectory, frame));
 
-        CHFL_TOPOLOGY* topology = chfl_topology_from_frame(frame);
+        const CHFL_TOPOLOGY* topology = chfl_topology_from_frame(frame);
         REQUIRE(topology);
 
         uint64_t natoms = 0;
@@ -115,17 +151,17 @@ TEST_CASE("Read trajectory") {
         CHECK_STATUS(chfl_topology_bonds_count(topology, &n));
         CHECK(n == 0);
 
-        CHFL_ATOM* atom = chfl_atom_from_topology(topology, 0);
+        const CHFL_ATOM* atom = chfl_atom_from_frame(frame, 0);
         REQUIRE(atom);
 
         char name[32];
         CHECK_STATUS(chfl_atom_name(atom, name, sizeof(name)));
         CHECK(name == std::string("O"));
 
-        CHECK_STATUS(chfl_atom_free(atom));
-        CHECK_STATUS(chfl_topology_free(topology));
-        CHECK_STATUS(chfl_frame_free(frame));
-        CHECK_STATUS(chfl_trajectory_close(trajectory));
+        chfl_free(atom);
+        chfl_free(topology);
+        chfl_free(frame);
+        chfl_trajectory_close(trajectory);
     }
 
     SECTION("Set cell") {
@@ -133,9 +169,9 @@ TEST_CASE("Read trajectory") {
         REQUIRE(trajectory);
 
         chfl_vector3d lengths = {30, 30, 30};
-        CHFL_CELL* cell = chfl_cell(lengths);
+        CHFL_CELL* cell = chfl_cell(lengths, nullptr);
         CHECK_STATUS(chfl_trajectory_set_cell(trajectory, cell));
-        CHECK_STATUS(chfl_cell_free(cell));
+        chfl_free(cell);
 
         CHFL_FRAME* frame = chfl_frame();
         REQUIRE(frame);
@@ -150,9 +186,9 @@ TEST_CASE("Read trajectory") {
         CHECK(data[1] == 30.0);
         CHECK(data[2] == 30.0);
 
-        CHECK_STATUS(chfl_cell_free(cell));
-        CHECK_STATUS(chfl_frame_free(frame));
-        CHECK_STATUS(chfl_trajectory_close(trajectory));
+        chfl_free(cell);
+        chfl_free(frame);
+        chfl_trajectory_close(trajectory);
     }
 
     SECTION("Set topology") {
@@ -170,8 +206,8 @@ TEST_CASE("Read trajectory") {
 
         CHECK_STATUS(chfl_trajectory_set_topology(trajectory, topology));
 
-        CHECK_STATUS(chfl_atom_free(atom));
-        CHECK_STATUS(chfl_topology_free(topology));
+        chfl_free(atom);
+        chfl_free(topology);
 
         CHFL_FRAME* frame = chfl_frame();
         REQUIRE(frame);
@@ -182,9 +218,9 @@ TEST_CASE("Read trajectory") {
         CHECK_STATUS(chfl_atom_name(atom, name, sizeof(name)));
         CHECK(name == std::string("Cs"));
 
-        CHECK_STATUS(chfl_atom_free(atom));
-        CHECK_STATUS(chfl_frame_free(frame));
-        CHECK_STATUS(chfl_trajectory_close(trajectory));
+        chfl_free(atom);
+        chfl_free(frame);
+        chfl_trajectory_close(trajectory);
     }
 
     SECTION("Set topology from file") {
@@ -198,10 +234,10 @@ TEST_CASE("Read trajectory") {
         CHECK_STATUS(chfl_trajectory_read(trajectory, frame));
 
         CHFL_ATOM* atom = chfl_atom_from_frame(frame, 0);
-        char name[32];
+        char name[32] = {0};
         CHECK_STATUS(chfl_atom_name(atom, name, sizeof(name)));
         CHECK(name == std::string("Zn"));
-        CHECK_STATUS(chfl_atom_free(atom));
+        chfl_free(atom);
 
         CHECK_STATUS(chfl_trajectory_topology_file(trajectory, "data/xyz/topology.xyz.topology", "XYZ"));
         CHECK_STATUS(chfl_trajectory_read(trajectory, frame));
@@ -209,24 +245,24 @@ TEST_CASE("Read trajectory") {
         atom = chfl_atom_from_frame(frame, 0);
         CHECK_STATUS(chfl_atom_name(atom, name, sizeof(name)));
         CHECK(name == std::string("Zn"));
-        CHECK_STATUS(chfl_atom_free(atom));
+        chfl_free(atom);
 
-        CHECK_STATUS(chfl_frame_free(frame));
-        CHECK_STATUS(chfl_trajectory_close(trajectory));
+        chfl_free(frame);
+        chfl_trajectory_close(trajectory);
     }
 }
 
 TEST_CASE("Write trajectory") {
-    auto filename = NamedTempPath(".xyz");
+    auto tmpfile = NamedTempPath(".xyz");
     const char* EXPECTED_CONTENT =
     "4\n"
-    "Written by the chemfiles library\n"
+    "Properties=species:S:1:pos:R:3\n"
     "He 1 2 3\n"
     "He 1 2 3\n"
     "He 1 2 3\n"
     "He 1 2 3\n";
 
-    CHFL_TRAJECTORY* trajectory = chfl_trajectory_open(filename.c_str(), 'w');
+    CHFL_TRAJECTORY* trajectory = chfl_trajectory_open(tmpfile.path().c_str(), 'w');
     REQUIRE(trajectory);
 
     CHFL_FRAME* frame = testing_frame();
@@ -234,16 +270,52 @@ TEST_CASE("Write trajectory") {
 
     CHECK_STATUS(chfl_trajectory_write(trajectory, frame));
 
-    CHECK_STATUS(chfl_frame_free(frame));
-    CHECK_STATUS(chfl_trajectory_close(trajectory));
+    chfl_free(frame);
+    chfl_trajectory_close(trajectory);
 
-    std::ifstream file(filename);
+    std::ifstream file(tmpfile);
     REQUIRE(file.is_open());
     std::stringstream content;
     content << file.rdbuf();
     file.close();
 
     CHECK(content.str() == EXPECTED_CONTENT);
+}
+
+TEST_CASE("Write trajectory to memory") {
+    // Make sure this fails
+    CHECK(chfl_trajectory_memory_writer("") == nullptr);
+
+    const char* EXPECTED_CONTENT =
+    "4\n"
+    "Properties=species:S:1:pos:R:3\n"
+    "He 1 2 3\n"
+    "He 1 2 3\n"
+    "He 1 2 3\n"
+    "He 1 2 3\n";
+
+    CHFL_TRAJECTORY* trajectory = chfl_trajectory_memory_writer("XYZ");
+    REQUIRE(trajectory);
+
+    CHFL_FRAME* frame = testing_frame();
+    REQUIRE(frame);
+
+    CHECK_STATUS(chfl_trajectory_write(trajectory, frame));
+
+    const char* data = nullptr;
+    uint64_t size;
+    CHECK_STATUS(chfl_trajectory_memory_buffer(trajectory, &data, &size));
+    CHECK(size == std::strlen(EXPECTED_CONTENT));
+    CHECK(std::string(data) == EXPECTED_CONTENT);
+
+    chfl_free(frame);
+    chfl_trajectory_close(trajectory);
+
+    // Make sure that we can not access memory buffer on standard trajectories
+    trajectory = chfl_trajectory_open("data/xyz/trajectory.xyz", 'r');
+    REQUIRE(trajectory);
+    CHECK(chfl_trajectory_memory_buffer(trajectory, &data, &size) != CHFL_SUCCESS);
+    chfl_free(trajectory);
 }
 
 static CHFL_FRAME* testing_frame() {
@@ -255,16 +327,16 @@ static CHFL_FRAME* testing_frame() {
     for (unsigned i=0; i<4; i++) {
         CHECK_STATUS(chfl_topology_add_atom(topology, atom));
     }
-    CHECK_STATUS(chfl_atom_free(atom));
+    chfl_free(atom);
 
     CHFL_FRAME* frame = chfl_frame();
     REQUIRE(frame);
     CHECK_STATUS(chfl_frame_resize(frame, 4));
 
     CHECK_STATUS(chfl_frame_set_topology(frame, topology));
-    CHECK_STATUS(chfl_topology_free(topology));
+    chfl_free(topology);
 
-    chfl_vector3d* positions = NULL;
+    chfl_vector3d* positions = nullptr;
     uint64_t natoms = 0;
     CHECK_STATUS(chfl_frame_positions(frame, &positions, &natoms));
     CHECK(natoms == 4);

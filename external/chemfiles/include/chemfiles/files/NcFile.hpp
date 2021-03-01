@@ -1,16 +1,18 @@
 // Chemfiles, a modern library for chemistry file reading and writing
 // Copyright (C) Guillaume Fraux and contributors -- BSD license
 
-#ifndef CHEMFILES_NCFILE_HPP
-#define CHEMFILES_NCFILE_HPP
+#ifndef CHEMFILES_NC_FILE_HPP
+#define CHEMFILES_NC_FILE_HPP
 
+#include <cassert>
 #include <vector>
 #include <string>
 
 #include <netcdf.h>
+#include <fmt/format.h>
 
 #include "chemfiles/File.hpp"
-#include "chemfiles/ErrorFmt.hpp"
+#include "chemfiles/error_fmt.hpp"
 
 namespace chemfiles {
 
@@ -26,7 +28,7 @@ namespace nc {
         }
     }
 
-    /// Maximum lenght for strings in variables
+    /// Maximum length for strings in variables
     const size_t STRING_MAXLEN = 10;
 
     /// NetCDF id type definition
@@ -51,11 +53,16 @@ namespace nc {
         /// Get the dimensions size for this variable
         std::vector<size_t> dimmensions() const;
 
-        /// Get the attribute `name`.
-        std::string attribute(const std::string& name) const;
-        /// Add an attribute with the given `value` and `name`.
-        void add_attribute(const std::string& name, const std::string& value);
-    protected:
+        /// Get the string attribute `name`.
+        std::string string_attribute(const std::string& name) const;
+        /// Get the float attribute `name`.
+        float float_attribute(const std::string& name) const;
+        /// Add a string attribute with the given `value` and `name`.
+        void add_string_attribute(const std::string& name, const std::string& value);
+        /// Check if an attribute exists
+        bool attribute_exists(const std::string& name) const;
+
+      protected:
         netcdf_id_t file_id_;
         netcdf_id_t var_id_;
     };
@@ -92,10 +99,10 @@ namespace nc {
 /// The template functions are manually specialized for float and char data types.
 class NcFile final: public File {
 public:
-    NcFile(const std::string& filename, File::Mode mode);
-    ~NcFile() noexcept override;
-    NcFile(NcFile&&) = default;
-    NcFile& operator=(NcFile&&) = delete;
+    NcFile(std::string path, File::Mode mode);
+    ~NcFile() override;
+    NcFile(NcFile&&) noexcept = default;
+    NcFile& operator=(NcFile&&) = default;
     NcFile(NcFile const&) = delete;
     NcFile& operator=(NcFile const&) = delete;
 
@@ -117,9 +124,9 @@ public:
         return file_id_;
     }
 
-    /// Get a global string attribut from the file
+    /// Get a global string attribute from the file
     std::string global_attribute(const std::string& name) const;
-    /// Create a global attribut in the file_
+    /// Create a global attribute in the file_
     void add_global_attribute(const std::string& name, const std::string& value);
 
     /// Get the value of a specific dimmension

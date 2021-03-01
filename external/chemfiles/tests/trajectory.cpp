@@ -8,12 +8,12 @@
 #include "chemfiles.hpp"
 using namespace chemfiles;
 
-// This file only perform basic testing of the trajectory class. All the differents
-// formats are tested in the formats folder
+// This file only perform basic testing of the trajectory class. All the
+// different formats are tested in the formats folder
 TEST_CASE("Associate a topology and a trajectory") {
     SECTION("Reading") {
         SECTION("From a file") {
-            Trajectory file("data/xyz/trajectory.xyz");
+            auto file = Trajectory("data/xyz/trajectory.xyz");
             file.set_topology("data/xyz/topology.xyz.topology", "XYZ");
             auto frame = file.read();
 
@@ -26,7 +26,7 @@ TEST_CASE("Associate a topology and a trajectory") {
         }
 
         SECTION("Directely") {
-            Trajectory file("data/xyz/trajectory.xyz");
+            auto file = Trajectory("data/xyz/trajectory.xyz");
 
             Topology topology;
             for (size_t i=0; i<9; i++) {
@@ -49,29 +49,24 @@ TEST_CASE("Associate a topology and a trajectory") {
         auto tmpfile = NamedTempPath(".xyz");
         const auto EXPECTED_CONTENT =
         "5\n"
-        "Written by the chemfiles library\n"
+        "Properties=species:S:1:pos:R:3\n"
         "Fe 1 2 3\n"
         "Fe 1 2 3\n"
         "Fe 1 2 3\n"
         "Fe 1 2 3\n"
         "Fe 1 2 3\n";
 
+        auto frame = Frame();
         auto topology = Topology();
         for (size_t i=0; i<5; i++) {
             topology.add_atom(Atom("Fe"));
+            frame.add_atom(Atom("Ar"), {1, 2, 3});
         }
 
-        auto frame = Frame(topology);
-        auto positions = frame.positions();
-        for(size_t i=0; i<5; i++) {
-            positions[i] = Vector3D(1, 2, 3);
-        }
-
-        {
-            Trajectory file(tmpfile, 'w');
-            file.set_topology(topology);
-            file.write(frame);
-        }
+        auto file = Trajectory(tmpfile, 'w');
+        file.set_topology(topology);
+        file.write(frame);
+        file.close();
 
         std::ifstream checking(tmpfile);
         std::string content{
@@ -84,7 +79,7 @@ TEST_CASE("Associate a topology and a trajectory") {
 
 
 TEST_CASE("Setting frame step") {
-    Trajectory file("data/xyz/helium.xyz");
+    auto file = Trajectory("data/xyz/helium.xyz");
     auto frame = file.read();
     CHECK(frame.step() == 0);
 
@@ -98,11 +93,11 @@ TEST_CASE("Setting frame step") {
 
 TEST_CASE("Associate an unit cell and a trajectory") {
     SECTION("Reading") {
-        Trajectory file("data/xyz/trajectory.xyz");
-        file.set_cell(UnitCell(25, 32, 94));
+        auto file = Trajectory("data/xyz/trajectory.xyz");
+        file.set_cell(UnitCell({25, 32, 94}));
         auto frame = file.read();
 
-        CHECK(frame.cell() == UnitCell(25, 32, 94));
+        CHECK(frame.cell() == UnitCell({25, 32, 94}));
     }
 
     SECTION("Writing") {
@@ -115,8 +110,8 @@ TEST_CASE("Associate an unit cell and a trajectory") {
             positions[i] = Vector3D(1, 2, 3);
         }
 
-        Trajectory file(tmpfile, 'w');
-        file.set_cell(UnitCell(3, 4, 5));
+        auto file = Trajectory(tmpfile, 'w');
+        file.set_cell(UnitCell({3, 4, 5}));
         file.write(frame);
         file.close();
 
@@ -124,9 +119,9 @@ TEST_CASE("Associate an unit cell and a trajectory") {
             const auto EXPECTED_CONTENT =
             "MODEL    1\n"
             "CRYST1    3.000    4.000    5.000  90.00  90.00  90.00 P 1           1\n"
-            "HETATM    1      XXX X   1       1.000   2.000   3.000  1.00  0.00            \n"
-            "HETATM    2      XXX X   2       1.000   2.000   3.000  1.00  0.00            \n"
-            "HETATM    3      XXX X   3       1.000   2.000   3.000  1.00  0.00            \n"
+            "HETATM    1              1       1.000   2.000   3.000  1.00  0.00            \n"
+            "HETATM    2              2       1.000   2.000   3.000  1.00  0.00            \n"
+            "HETATM    3              3       1.000   2.000   3.000  1.00  0.00            \n"
             "ENDMDL\n"
             "END\n";
 
@@ -142,14 +137,14 @@ TEST_CASE("Associate an unit cell and a trajectory") {
             const auto EXPECTED_CONTENT =
             "MODEL    1\n"
             "CRYST1    3.000    4.000    5.000  90.00  90.00  90.00 P 1           1\n"
-            "HETATM    1      XXX X   1       1.000   2.000   3.000  1.00  0.00            \n"
-            "HETATM    2      XXX X   2       1.000   2.000   3.000  1.00  0.00            \n"
-            "HETATM    3      XXX X   3       1.000   2.000   3.000  1.00  0.00            \n"
+            "HETATM    1              1       1.000   2.000   3.000  1.00  0.00            \n"
+            "HETATM    2              2       1.000   2.000   3.000  1.00  0.00            \n"
+            "HETATM    3              3       1.000   2.000   3.000  1.00  0.00            \n"
             "ENDMDL\n"
             "END\n"
             "MODEL    1\n"
             "CRYST1    0.000    0.000    0.000  90.00  90.00  90.00 P 1           1\n"
-            "HETATM    1      XXX X   1       1.000   2.000   3.000  1.00  0.00            \n"
+            "HETATM    1              1       1.000   2.000   3.000  1.00  0.00            \n"
             "ENDMDL\n"
             "END\n";
 
@@ -169,9 +164,38 @@ TEST_CASE("Associate an unit cell and a trajectory") {
 }
 
 TEST_CASE("Specify a format parameter") {
-    Trajectory file("data/xyz/helium.xyz.but.not.really", 'r', "XYZ");
+    auto file = Trajectory("data/xyz/helium.xyz.but.not.really", 'r', "XYZ");
     auto frame = file.read();
     CHECK(frame.size() == 125);
+
+    auto tmpfile = NamedTempPath(".xyz");
+    file = Trajectory(tmpfile, 'w', "XYZ / GZ");
+    frame = Frame();
+    frame.add_atom(Atom("Fe"), {0, 1, 2});
+    file.write(frame);
+    file.close();
+
+    // Full format specification
+    frame = Trajectory(tmpfile, 'r', "XYZ / GZ").read();
+    CHECK(frame.size() == 1);
+    CHECK(frame[0].name() == "Fe");
+
+    frame = Trajectory(tmpfile, 'r', "XYZ/ GZ").read();
+    CHECK(frame.size() == 1);
+    CHECK(frame[0].name() == "Fe");
+
+    frame = Trajectory(tmpfile, 'r', "XYZ/GZ").read();
+    CHECK(frame.size() == 1);
+    CHECK(frame[0].name() == "Fe");
+
+    frame = Trajectory(tmpfile, 'r', "XYZ /GZ").read();
+    CHECK(frame.size() == 1);
+    CHECK(frame[0].name() == "Fe");
+
+    // only the compression method, the format will be guessed from extension
+    frame = Trajectory(tmpfile, 'r', "/ GZ").read();
+    CHECK(frame.size() == 1);
+    CHECK(frame[0].name() == "Fe");
 }
 
 TEST_CASE("Errors") {
@@ -179,10 +203,15 @@ TEST_CASE("Errors") {
         CHECK_THROWS_AS(Trajectory("trajectory.xyz", 'z'), FileError);
     }
 
+    SECTION("Unknow compression method") {
+        CHECK_THROWS_AS(Trajectory("trajectory.xyz", 'r', "XYZ / FOOzip"), FileError);
+        CHECK_THROWS_AS(Trajectory("trajectory.xyz", 'r', "XYZ /"), FileError);
+    }
+
     SECTION("Bad opening mode") {
         auto tmpfile = NamedTempPath(".xyz");
         // Try to read a write-only file
-        Trajectory file(tmpfile, 'w');
+        auto file = Trajectory(tmpfile, 'w');
         CHECK_THROWS_AS(file.read(), FileError);
         CHECK_THROWS_AS(file.read_step(5), FileError);
 
@@ -192,7 +221,7 @@ TEST_CASE("Errors") {
     }
 
     SECTION("Read file past end") {
-        Trajectory file("data/xyz/trajectory.xyz", 'r');
+        auto file = Trajectory("data/xyz/trajectory.xyz", 'r');
         CHECK_THROWS_AS(file.read_step(2), FileError);
 
         file.read();
@@ -201,7 +230,7 @@ TEST_CASE("Errors") {
     }
 
     SECTION("Closed file") {
-        Trajectory file("data/xyz/trajectory.xyz", 'r');
+        auto file = Trajectory("data/xyz/trajectory.xyz", 'r');
         file.close();
 
         CHECK_THROWS_AS(file.read(), FileError);

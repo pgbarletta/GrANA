@@ -5,28 +5,29 @@
 #define CHEMFILES_FORMAT_MOLFILE_HPP
 
 extern "C" {
-#include "vmdplugin.h"
-#include "molfile_plugin.h"
+    #include "vmdplugin.h"
+    #include "molfile_plugin.h"
 }
 
-#include "chemfiles/Format.hpp"
+#include <string>
+#include <vector>
+
 #include "chemfiles/File.hpp"
-#include "chemfiles/Topology.hpp"
+#include "chemfiles/Frame.hpp"
+#include "chemfiles/Format.hpp"
+#include "chemfiles/Topology.hpp"   // IWYU pragma: keep
 #include "chemfiles/external/optional.hpp"
 
 namespace chemfiles {
+class FormatMetadata;
 
 /// List all the VMD molfile plugins enabled. For more documentation about VMD
 /// molfile plugins, please see:
 /// http://www.ks.uiuc.edu/Research/vmd/plugins/molfile/
 enum MolfileFormat {
     DCD,                ///< DCD binary file format
-    GRO,                ///< Gromacs .gro file format
-    TRR,                ///< Gromacs .trr file format
-    XTC,                ///< Gromacs .xtc file format
     TRJ,                ///< Gromacs .trj file format
-    LAMMPS,             ///< Lammps trajectory files
-    MOL2,               ///< MOL2 file format
+    LAMMPS,             ///< LAMMPS trajectory files
     MOLDEN,             ///< Molden file format
 };
 
@@ -55,14 +56,11 @@ struct MolfilePluginData final {
 template <MolfileFormat F>
 class Molfile final: public Format {
 public:
-    Molfile(const std::string& path, File::Mode mode);
-    ~Molfile() noexcept override;
-    Molfile(const Molfile&) = delete;
-    Molfile& operator=(const Molfile&) = delete;
-    Molfile(Molfile&&) = default;
-    Molfile& operator=(Molfile&&) = default;
+    Molfile(std::string path, File::Mode mode, File::Compression compression);
+    ~Molfile() override;
 
     void read(Frame& frame) override;
+    void read_step(size_t step, Frame& frame) override;
     size_t nsteps() override;
 private:
     /// Convert a molfile timestep to a chemfiles frame
@@ -84,16 +82,14 @@ private:
     int natoms_;
     /// Store optional topological information
     optional<Topology> topology_;
+    /// Store pre-read steps to implement read_step
+    std::vector<Frame> frames_;
 };
 
-template<> FormatInfo format_information<Molfile<DCD>>();
-template<> FormatInfo format_information<Molfile<GRO>>();
-template<> FormatInfo format_information<Molfile<TRR>>();
-template<> FormatInfo format_information<Molfile<XTC>>();
-template<> FormatInfo format_information<Molfile<TRJ>>();
-template<> FormatInfo format_information<Molfile<MOL2>>();
-template<> FormatInfo format_information<Molfile<LAMMPS>>();
-template<> FormatInfo format_information<Molfile<MOLDEN>>();
+template<> const FormatMetadata& format_metadata<Molfile<DCD>>();
+template<> const FormatMetadata& format_metadata<Molfile<TRJ>>();
+template<> const FormatMetadata& format_metadata<Molfile<LAMMPS>>();
+template<> const FormatMetadata& format_metadata<Molfile<MOLDEN>>();
 
 } // namespace chemfiles
 

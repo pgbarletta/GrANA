@@ -4,7 +4,12 @@
 #ifndef CHEMFILES_CHFL_FRAME_H
 #define CHEMFILES_CHFL_FRAME_H
 
+#include <stdint.h>
+#include <stdbool.h>  // IWYU pragma: keep
+
 #include "chemfiles/capi/types.h"
+#include "chemfiles/exports.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -12,9 +17,9 @@ extern "C" {
 /// Create a new empty frame.
 ///
 /// The caller of this function should free the allocated memory using
-/// `chfl_frame_free`.
+/// `chfl_free`.
 ///
-/// @example{tests/capi/doc/chfl_frame/chfl_frame.c}
+/// @example{capi/chfl_frame/chfl_frame.c}
 /// @return A pointer to the frame, or NULL in case of error. You can use
 ///         `chfl_last_error` to learn about the error.
 CHFL_EXPORT CHFL_FRAME* chfl_frame(void);
@@ -22,21 +27,21 @@ CHFL_EXPORT CHFL_FRAME* chfl_frame(void);
 /// Get a copy of a `frame`.
 ///
 /// The caller of this function should free the associated memory using
-/// `chfl_frame_free`.
+/// `chfl_free`.
 ///
-/// @example{tests/capi/doc/chfl_frame/copy.c}
-/// @return A pointer to the new frame, or NULL in case of error.
-///         You can use `chfl_last_error` to learn about the error.
+/// @example{capi/chfl_frame/copy.c}
+/// @return A pointer to the new frame, or NULL in case of error. You can use
+///         `chfl_last_error` to learn about the error.
 CHFL_EXPORT CHFL_FRAME* chfl_frame_copy(const CHFL_FRAME* frame);
 
 /// Get the current number of atoms in a `frame` in the integer pointed to by
-/// `size`
+/// `count`
 ///
-/// @example{tests/capi/doc/chfl_frame/atoms_count.c}
+/// @example{capi/chfl_frame/atoms_count.c}
 /// @return The operation status code. You can use `chfl_last_error` to learn
 ///         about the error if the status code is not `CHFL_SUCCESS`.
 CHFL_EXPORT chfl_status chfl_frame_atoms_count(
-    const CHFL_FRAME* frame, uint64_t* size
+    const CHFL_FRAME* frame, uint64_t* count
 );
 
 /// Get a pointer to the positions array from a `frame`.
@@ -47,11 +52,11 @@ CHFL_EXPORT chfl_status chfl_frame_atoms_count(
 ///
 /// If the frame is resized (by writing to it, or calling `chfl_frame_resize`,
 /// `chfl_frame_remove` or `chfl_frame_add_atom`), the pointer is invalidated.
-/// If the frame is freed using `chfl_frame_free`, the pointer is freed too.
-/// There is then no need to free the `*positions` pointer for the caller of
-/// this function.
 ///
-/// @example{tests/capi/doc/chfl_frame/positions.c}
+/// If the frame memory is released using `chfl_free`, the memory behind the
+/// `*positions` pointer is released too.
+///
+/// @example{capi/chfl_frame/positions.c}
 /// @return The operation status code. You can use `chfl_last_error` to learn
 ///         about the error if the status code is not `CHFL_SUCCESS`.
 CHFL_EXPORT chfl_status chfl_frame_positions(
@@ -61,20 +66,20 @@ CHFL_EXPORT chfl_status chfl_frame_positions(
 /// Get a pointer to the velocities array from a `frame`.
 ///
 /// Velocities are stored as a `size x 3` array, this function set the pointer
-/// pointed to by `positions` to point to the first element of this array, and
+/// pointed to by `velocities` to point to the first element of this array, and
 /// give the number of atoms in the integer pointed to by `size`.
 ///
 /// If the frame is resized (by writing to it, or calling `chfl_frame_resize`,
 /// `chfl_frame_remove` or `chfl_frame_add_atom`), the pointer is invalidated.
-/// If the frame is freed using `chfl_frame_free`, the pointer is freed too.
-/// There is then no need to free the `*velocity` pointer for the caller of this
-/// function.
 ///
-/// If the frame does not have velocity, this will return an error. Use
-/// `chfl_frame_add_velocities` to add velocities to a frame before calling
-/// this function.
+/// If the frame memory is released using `chfl_free`, the memory behind the
+/// `*velocities` pointer is released too.
 ///
-/// @example{tests/capi/doc/chfl_frame/velocities.c}
+/// If the frame does not have velocity, this will return an error. You can use
+/// `chfl_frame_add_velocities` to ensure that a frame contains velocity data
+/// before calling this function.
+///
+/// @example{capi/chfl_frame/velocities.c}
 /// @return The operation status code. You can use `chfl_last_error` to learn
 ///         about the error if the status code is not `CHFL_SUCCESS`.
 CHFL_EXPORT chfl_status chfl_frame_velocities(
@@ -86,7 +91,7 @@ CHFL_EXPORT chfl_status chfl_frame_velocities(
 ///
 /// `velocity` can be `NULL` if no velocity is associated with the atom.
 ///
-/// @example{tests/capi/doc/chfl_frame/add_atom.c}
+/// @example{capi/chfl_frame/add_atom.c}
 /// @return The operation status code. You can use `chfl_last_error` to learn
 ///         about the error if the status code is not `CHFL_SUCCESS`.
 CHFL_EXPORT chfl_status chfl_frame_add_atom(
@@ -99,7 +104,7 @@ CHFL_EXPORT chfl_status chfl_frame_add_atom(
 /// This modify all the atoms indexes after `i`, and invalidate any pointer
 /// obtained using `chfl_frame_positions` or `chfl_frame_velocities`.
 ///
-/// @example{tests/capi/doc/chfl_frame/remove.c}
+/// @example{capi/chfl_frame/remove.c}
 /// @return The operation status code. You can use `chfl_last_error` to learn
 ///         about the error if the status code is not `CHFL_SUCCESS`.
 CHFL_EXPORT chfl_status chfl_frame_remove(CHFL_FRAME* frame, uint64_t i);
@@ -111,7 +116,7 @@ CHFL_EXPORT chfl_status chfl_frame_remove(CHFL_FRAME* frame, uint64_t i);
 /// if the new size is bigger than the old one. In all the cases, previous data
 /// is conserved. This function conserve the presence or absence of velocities.
 ///
-/// @example{tests/capi/doc/chfl_frame/resize.c}
+/// @example{capi/chfl_frame/resize.c}
 /// @return The operation status code. You can use `chfl_last_error` to learn
 ///         about the error if the status code is not `CHFL_SUCCESS`.
 CHFL_EXPORT chfl_status chfl_frame_resize(
@@ -123,7 +128,7 @@ CHFL_EXPORT chfl_status chfl_frame_resize(
 /// The velocities are initialized to `(chfl_vector3d){0, 0, 0}`. If the frame
 /// already has velocities, this does nothing.
 ///
-/// @example{tests/capi/doc/chfl_frame/add_velocities.c}
+/// @example{capi/chfl_frame/add_velocities.c}
 /// @return The operation status code. You can use `chfl_last_error` to learn
 ///         about the error if the status code is not `CHFL_SUCCESS`.
 CHFL_EXPORT chfl_status chfl_frame_add_velocities(CHFL_FRAME* frame);
@@ -131,7 +136,7 @@ CHFL_EXPORT chfl_status chfl_frame_add_velocities(CHFL_FRAME* frame);
 /// Check if this `frame` contains velocity data, and store the result in
 /// `has_velocities`
 ///
-/// @example{tests/capi/doc/chfl_frame/has_velocities.c}
+/// @example{capi/chfl_frame/has_velocities.c}
 /// @return The operation status code. You can use `chfl_last_error` to learn
 ///         about the error if the status code is not `CHFL_SUCCESS`.
 CHFL_EXPORT chfl_status chfl_frame_has_velocities(
@@ -140,7 +145,7 @@ CHFL_EXPORT chfl_status chfl_frame_has_velocities(
 
 /// Set the unit cell of a `frame` to `cell`.
 ///
-/// @example{tests/capi/doc/chfl_frame/set_cell.c}
+/// @example{capi/chfl_frame/set_cell.c}
 /// @return The operation status code. You can use `chfl_last_error` to learn
 ///         about the error if the status code is not `CHFL_SUCCESS`.
 CHFL_EXPORT chfl_status chfl_frame_set_cell(
@@ -152,7 +157,7 @@ CHFL_EXPORT chfl_status chfl_frame_set_cell(
 /// Calling this function with a topology that does not contain the right
 /// number of atom will return an error.
 ///
-/// @example{tests/capi/doc/chfl_frame/set_topology.c}
+/// @example{capi/chfl_frame/set_topology.c}
 /// @return The operation status code. You can use `chfl_last_error` to learn
 ///         about the error if the status code is not `CHFL_SUCCESS`.
 CHFL_EXPORT chfl_status chfl_frame_set_topology(
@@ -162,7 +167,7 @@ CHFL_EXPORT chfl_status chfl_frame_set_topology(
 /// Get a `frame` step, *i.e.* the frame number in the trajectory in the integer
 /// pointed to by `step`.
 ///
-/// @example{tests/capi/doc/chfl_frame/step.c}
+/// @example{capi/chfl_frame/step.c}
 /// @return The operation status code. You can use `chfl_last_error` to learn
 ///         about the error if the status code is not `CHFL_SUCCESS`.
 CHFL_EXPORT chfl_status chfl_frame_step(
@@ -171,7 +176,7 @@ CHFL_EXPORT chfl_status chfl_frame_step(
 
 /// Set a `frame` step, *i.e.* the frame number in the trajectory to `step`.
 ///
-/// @example{tests/capi/doc/chfl_frame/set_step.c}
+/// @example{capi/chfl_frame/set_step.c}
 /// @return The operation status code. You can use `chfl_last_error` to learn
 ///         about the error if the status code is not `CHFL_SUCCESS`.
 CHFL_EXPORT chfl_status chfl_frame_set_step(
@@ -183,16 +188,16 @@ CHFL_EXPORT chfl_status chfl_frame_set_step(
 /// The bonds are guessed using a distance-based algorithm, and then angles and
 /// dihedrals are guessed from the bonds.
 ///
-/// @example{tests/capi/doc/chfl_frame/guess_topology.c}
+/// @example{capi/chfl_frame/guess_bonds.c}
 /// @return The operation status code. You can use `chfl_last_error` to learn
 ///         about the error if the status code is not `CHFL_SUCCESS`.
-CHFL_EXPORT chfl_status chfl_frame_guess_topology(CHFL_FRAME* frame);
+CHFL_EXPORT chfl_status chfl_frame_guess_bonds(CHFL_FRAME* frame);
 
 /// Get the distance between the atoms at indexes `i` and `j` in the `frame`,
 /// accounting for periodic boundary conditions. The result is placed in
 /// `distance`, and expressed in angstroms.
 ///
-/// @example{tests/capi/doc/chfl_frame/distance.c}
+/// @example{capi/chfl_frame/distance.c}
 /// @return The operation status code. You can use `chfl_last_error` to learn
 ///         about the error if the status code is not `CHFL_SUCCESS`.
 CHFL_EXPORT chfl_status chfl_frame_distance(
@@ -203,7 +208,7 @@ CHFL_EXPORT chfl_status chfl_frame_distance(
 /// `frame`, accounting for periodic boundary conditions. The result is placed
 /// in `angle`, and expressed in radians.
 ///
-/// @example{tests/capi/doc/chfl_frame/angle.c}
+/// @example{capi/chfl_frame/angle.c}
 /// @return The operation status code. You can use `chfl_last_error` to learn
 ///         about the error if the status code is not `CHFL_SUCCESS`.
 CHFL_EXPORT chfl_status chfl_frame_angle(
@@ -214,7 +219,7 @@ CHFL_EXPORT chfl_status chfl_frame_angle(
 /// `frame`, accounting for periodic boundary conditions. The result is placed
 /// in `dihedral`, and expressed in radians.
 ///
-/// @example{tests/capi/doc/chfl_frame/dihedral.c}
+/// @example{capi/chfl_frame/dihedral.c}
 /// @return The operation status code. You can use `chfl_last_error` to learn
 ///         about the error if the status code is not `CHFL_SUCCESS`.
 CHFL_EXPORT chfl_status chfl_frame_dihedral(
@@ -225,14 +230,39 @@ CHFL_EXPORT chfl_status chfl_frame_dihedral(
 /// and `m` in the `frame`, accounting for periodic boundary conditions. The
 /// result is placed in `distance` and expressed in angstroms.
 ///
-/// This is the distance betweent the atom j and the ikm plane. The j atom
+/// This is the distance between the atom j and the ikm plane. The j atom
 /// is the center of the improper dihedral angle formed by i, j, k and m.
 ///
-/// @example{tests/capi/doc/chfl_frame/out_of_plane.c}
+/// @example{capi/chfl_frame/out_of_plane.c}
 /// @return The operation status code. You can use `chfl_last_error` to learn
 ///         about the error if the status code is not `CHFL_SUCCESS`.
 CHFL_EXPORT chfl_status chfl_frame_out_of_plane(
     const CHFL_FRAME* frame, uint64_t i, uint64_t j, uint64_t k, uint64_t m, double* distance
+);
+
+/// Get the number of properties associated with this `frame` in `count`.
+///
+/// @example{capi/chfl_frame/properties_count.c}
+/// @return The operation status code. You can use `chfl_last_error` to learn
+///         about the error if the status code is not `CHFL_SUCCESS`.
+CHFL_EXPORT chfl_status chfl_frame_properties_count(
+    const CHFL_FRAME* frame, uint64_t* count
+);
+
+/// Get the names of all properties of this `frame` in the pre-allocated array
+/// `names` of size `count`.
+///
+/// `names` size must be passed in the `count` parameter, and be equal to the
+/// result of `chfl_frame_properties_count`.
+///
+/// The pointers in `names` are only valid until a new property is added to the
+/// frame with `chfl_frame_set_property`.
+///
+/// @example{capi/chfl_frame/list_properties.c}
+/// @return The operation status code. You can use `chfl_last_error` to learn
+///         about the error if the status code is not `CHFL_SUCCESS`.
+CHFL_EXPORT chfl_status chfl_frame_list_properties(
+    const CHFL_FRAME* frame, const char* names[], uint64_t count
 );
 
 /// Add a new `property` with the given `name` to this `frame`.
@@ -240,7 +270,7 @@ CHFL_EXPORT chfl_status chfl_frame_out_of_plane(
 /// If a property with the same name already exists, this function override the
 /// existing property with the new one.
 ///
-/// @example{tests/capi/doc/chfl_frame/property.c}
+/// @example{capi/chfl_frame/property.c}
 /// @return The operation status code. You can use `chfl_last_error` to learn
 ///         about the error if the status code is not `CHFL_SUCCESS`.
 CHFL_EXPORT chfl_status chfl_frame_set_property(
@@ -249,12 +279,12 @@ CHFL_EXPORT chfl_status chfl_frame_set_property(
 
 /// Get a property with the given `name` in this `frame`.
 ///
-/// This function returns `NULL` is no property exist with the given name.
+/// This function returns `NULL` if no property exists with the given name.
 ///
 /// The user of this function is responsible to deallocate memory using the
-/// `chfl_property_free` function.
+/// `chfl_free` function.
 ///
-/// @example{tests/capi/doc/chfl_frame/property.c}
+/// @example{capi/chfl_frame/property.c}
 /// @return A pointer to the property, or NULL in case of error.
 ///         You can use `chfl_last_error` to learn about the error.
 CHFL_EXPORT CHFL_PROPERTY* chfl_frame_get_property(
@@ -263,11 +293,21 @@ CHFL_EXPORT CHFL_PROPERTY* chfl_frame_get_property(
 
 /// Add a bond between the atoms at indexes `i` and `j` in the `frame`.
 ///
-/// @example{tests/capi/doc/chfl_frame/add_bond.c}
+/// @example{capi/chfl_frame/add_bond.c}
 /// @return The operation status code. You can use `chfl_last_error` to learn
 ///         about the error if the status code is not `CHFL_SUCCESS`.
 CHFL_EXPORT chfl_status chfl_frame_add_bond(
     CHFL_FRAME* frame, uint64_t i, uint64_t j
+);
+
+/// Add a bond between the atoms at indexes `i` and `j`
+/// with bond order `bond_order` in the `frame`.
+///
+/// @example{capi/chfl_frame/add_bond.c}
+/// @return The operation status code. You can use `chfl_last_error` to learn
+///         about the error if the status code is not `CHFL_SUCCESS`.
+CHFL_EXPORT chfl_status chfl_frame_bond_with_order(
+    CHFL_FRAME* frame, uint64_t i, uint64_t j, chfl_bond_order bond_order
 );
 
 /// Remove any existing bond between the atoms at indexes `i` and `j` in the
@@ -275,30 +315,32 @@ CHFL_EXPORT chfl_status chfl_frame_add_bond(
 ///
 /// This function does nothing if there is no bond between `i` and `j`.
 ///
-/// @example{tests/capi/doc/chfl_frame/remove_bond.c}
+/// @example{capi/chfl_frame/remove_bond.c}
 /// @return The operation status code. You can use `chfl_last_error` to learn
 ///         about the error if the status code is not `CHFL_SUCCESS`.
 CHFL_EXPORT chfl_status chfl_frame_remove_bond(
     CHFL_FRAME* frame, uint64_t i, uint64_t j
 );
 
+/// Remove all existing bonds, angles, dihedral angles and improper dihedral
+/// angles in the `frame`.
+///
+/// @example{capi/chfl_frame/clear_bonds.c}
+/// @return The operation status code. You can use `chfl_last_error` to learn
+///         about the error if the status code is not `CHFL_SUCCESS`.
+CHFL_EXPORT chfl_status chfl_frame_clear_bonds(CHFL_FRAME* frame);
+
 /// Add a copy of `residue` to this `frame`.
 ///
 /// The residue id must not already be in this frame's topology, and the residue
 /// must contain only atoms that are not already in another residue.
 ///
-/// @example{tests/capi/doc/chfl_frame/add_residue.c}
+/// @example{capi/chfl_frame/add_residue.c}
 /// @return The operation status code. You can use `chfl_last_error` to learn
 ///         about the error if the status code is not `CHFL_SUCCESS`.
 CHFL_EXPORT chfl_status chfl_frame_add_residue(
     CHFL_FRAME* frame, const CHFL_RESIDUE* residue
 );
-
-/// Free the memory associated with a `frame`.
-///
-/// @example{tests/capi/doc/chfl_frame/chfl_frame.c}
-/// @return `CHFL_SUCCESS`
-CHFL_EXPORT chfl_status chfl_frame_free(CHFL_FRAME* frame);
 
 #ifdef __cplusplus
 }

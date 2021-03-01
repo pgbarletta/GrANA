@@ -4,15 +4,27 @@
 #ifndef CHEMFILES_FORMAT_LAMMPS_DATA_HPP
 #define CHEMFILES_FORMAT_LAMMPS_DATA_HPP
 
-#include <unordered_map>
+#include <cstdint>
+#include <tuple>
 #include <limits>
+#include <vector>
+#include <string>
+#include <memory>
+#include <unordered_map>
 
-#include "chemfiles/Format.hpp"
 #include "chemfiles/File.hpp"
-#include "chemfiles/Topology.hpp"
+#include "chemfiles/Format.hpp"
+
+#include "chemfiles/Topology.hpp"  // IWYU pragma: keep
 #include "chemfiles/sorted_set.hpp"
+#include "chemfiles/string_view.hpp"
+#include "chemfiles/external/optional.hpp"
 
 namespace chemfiles {
+class Atom;
+class Frame;
+class MemoryBuffer;
+class FormatMetadata;
 
 struct atom_data final {
     double x = 0;
@@ -22,7 +34,7 @@ struct atom_data final {
     double mass = std::numeric_limits<double>::quiet_NaN();
     size_t index = 0;
     size_t type = 0;
-    size_t molid = static_cast<size_t>(-1);
+    size_t molid = 0;
 };
 
 /// Possible LAMMPS atom style
@@ -38,13 +50,11 @@ private:
     } style_;
     /// Did we send the hybrid style warning?
     mutable bool warned_ = false;
-    /// Number of expected data
-    int expected_ = 0;
 
 public:
-    atom_style(const std::string& name);
+    explicit atom_style(std::string name);
     /// Read a single line with this atom style
-    atom_data read_line(const std::string& line) const;
+    atom_data read_line(string_view line, size_t index) const;
 };
 
 // atom types are defined by the type string and the mass of the atom
@@ -109,7 +119,7 @@ private:
     sorted_set<improper_type> impropers_;
 };
 
-/// [LAMMPS Data] file format reader and writer.
+/// LAMMPS Data file format reader and writer.
 ///
 /// LAMMPS data files are not fully stand-alone, as one needs to know the atom
 /// style to read the data. This reader will try to guess the atom style by
@@ -117,22 +127,30 @@ private:
 /// reading any comment after the `Atoms` section name. If no atom style is
 /// specified, the code default to `full` and send a warning.
 ///
-/// The code alse tries to read atomic names at the end of data lines. For
+/// The code also tries to read atomic names at the end of data lines. For
 /// example, the atom at index 44 will have `C2` as atomic name.
 ///
 /// ```
 /// 44 44 2 0.000000 1.094000 2.061000 69.552002 # C2 RES
 /// ```
-///
-/// [LAMMPS Data]: http://lammps.sandia.gov/doc/read_data.html
-class LAMMPSDataFormat final: public Format {
+class LAMMPSDataFormat final: public TextFormat {
 public:
-    LAMMPSDataFormat(const std::string& path, File::Mode mode);
+    LAMMPSDataFormat(std::string path, File::Mode mode, File::Compression compression):
+        TextFormat(std::move(path), mode, compression),
+        current_section_(HEADER),
+        style_("full")
+    {}
 
-    void read_step(size_t step, Frame& frame) override;
-    void read(Frame& frame) override;
-    void write(const Frame& frame) override;
-    size_t nsteps() override;
+    LAMMPSDataFormat(std::shared_ptr<MemoryBuffer> memory, File::Mode mode, File::Compression compression):
+        TextFormat(std::move(memory), mode, compression),
+        current_section_(HEADER),
+        style_("full")
+    {}
+
+    void read_next(Frame& frame) override;
+    void write_next(const Frame& frame) override;
+    optional<uint64_t> forward() override;
+
 private:
     enum section_t {
         HEADER,
@@ -145,13 +163,12 @@ private:
     } current_section_;
 
     /// Get the section corresponding to a given line
-    section_t get_section(std::string line);
-
+    section_t get_section(string_view line);
 
     /// Read the header section
     void read_header(Frame& frame);
-    size_t read_header_integer(const std::string& line, const std::string& context);
-    double read_header_box_bounds(const std::string& line, const std::string& context);
+    size_t read_header_integer(string_view line, const std::string& context);
+    double read_header_box_bounds(string_view line, const std::string& context);
 
     /// Get the section name from the next non-empty line
     void get_next_section();
@@ -173,26 +190,23 @@ private:
     void setup_names(Frame& frame) const;
 
     /// Write the header
-    void write_header(const Frame& frame);
+    void write_header(const DataTypes& types, const Frame& frame);
     /// Write the types sections
-    void write_types();
+    void write_types(const DataTypes& types);
     /// Write the masses section
-    void write_masses();
+    void write_masses(const DataTypes& types);
     /// Write the Atoms section
-    void write_atoms(const Frame& frame);
+    void write_atoms(const DataTypes& types, const Frame& frame);
     /// Write the Velocities section
     void write_velocities(const Frame& frame);
     /// Write the Bonds section
-    void write_bonds(const Topology& topology);
+    void write_bonds(const DataTypes& types, const Topology& topology);
     /// Write the Angles section
-    void write_angles(const Topology& topology);
+    void write_angles(const DataTypes& types, const Topology& topology);
     /// Write the Dihedrals section
-    void write_dihedrals(const Topology& topology);
+    void write_dihedrals(const DataTypes& types, const Topology& topology);
     /// Write the Impropers section
-    void write_impropers(const Topology& topology);
-
-    /// Text file where we read from
-    std::unique_ptr<TextFile> file_;
+    void write_impropers(const DataTypes& types, const Topology& topology);
 
     // =============== Data used for reading files
     /// Name of the atom style to use when reading the "Atoms" section
@@ -209,14 +223,9 @@ private:
     std::unordered_map<std::string, double> masses_;
     /// Optional atomic names, indexed by atomic indexes
     std::vector<std::string> names_;
-
-    // =============== Data used for writting files
-    /// Did we already wrote a frame to this file
-    bool written_ = false;
-    DataTypes types_;
 };
 
-template<> FormatInfo format_information<LAMMPSDataFormat>();
+template<> const FormatMetadata& format_metadata<LAMMPSDataFormat>();
 
 } // namespace chemfiles
 

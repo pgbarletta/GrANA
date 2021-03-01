@@ -4,9 +4,10 @@
 #ifndef CHEMFILES_ATOM_HPP
 #define CHEMFILES_ATOM_HPP
 
+#include <cstdint>
 #include <string>
 
-#include "chemfiles/exports.hpp"
+#include "chemfiles/exports.h"
 #include "chemfiles/Property.hpp"
 #include "chemfiles/external/optional.hpp"
 
@@ -15,7 +16,7 @@ namespace chemfiles {
 /// An `Atom` is a particle in the current `Frame`.
 ///
 /// An atom stores atomic properties such as the atom name and type, the mass
-/// and the charge. It also stores arbitrary property unsing the Property class.
+/// and the charge. It also stores arbitrary property using the Property class.
 /// Position and velocity are not stored in the `Atom` class, but in separated
 /// arrays in the `Frame` class.
 ///
@@ -31,7 +32,7 @@ public:
     /// the matching value. This check is executed with case-insensitive atom
     /// type: `Na`, `NA`, `nA` and `na` all get the `Na` mass.
     ///
-    /// @example{tests/doc/atom/atom.cpp}
+    /// @example{atom/atom.cpp}
     ///
     /// @param name atomic name for the new atom
     explicit Atom(std::string name = "");
@@ -42,7 +43,7 @@ public:
     /// the matching value. This check is executed with case-insensitive atom
     /// type: `Na`, `NA`, `nA` and `na` all get the `Na` mass.
     ///
-    /// @example{tests/doc/atom/atom.cpp}
+    /// @example{atom/atom.cpp}
     ///
     /// @param name atomic name for the new atom
     /// @param type atomic type for the new atom
@@ -56,42 +57,50 @@ public:
 
     /// Get the atom name.
     ///
-    /// @example{tests/doc/atom/name.cpp}
+    /// @example{atom/name.cpp}
     const std::string& name() const { return name_; }
 
     /// Get the atom type.
     ///
-    /// @example{tests/doc/atom/type.cpp}
+    /// @example{atom/type.cpp}
     const std::string& type() const { return type_; }
 
     /// Get the atom mass.
     ///
-    /// @example{tests/doc/atom/mass.cpp}
+    /// The default mass is set when constructing the atom from the atomic type.
+    /// To change the default value for a given type, you can use configuration
+    /// files.
+    ///
+    /// @example{atom/mass.cpp}
     double mass() const { return mass_; }
 
     /// Get the atom charge.
     ///
-    /// @example{tests/doc/atom/charge.cpp}
+    /// The default charge is set when constructing the atom from the atomic
+    /// type (usually to 0). To change the default value for a given type, you
+    /// can use configuration files.
+    ///
+    /// @example{atom/charge.cpp}
     double charge() const { return charge_; }
 
     /// Set the atom name to `name`.
     ///
-    /// @example{tests/doc/atom/name.cpp}
+    /// @example{atom/name.cpp}
     void set_name(std::string name) { name_ = std::move(name); }
 
     /// Set the atom type to `type`.
     ///
-    /// @example{tests/doc/atom/type.cpp}
+    /// @example{atom/type.cpp}
     void set_type(std::string type) { type_ = std::move(type); }
 
     /// Set the atom mass to `mass`.
     ///
-    /// @example{tests/doc/atom/mass.cpp}
+    /// @example{atom/mass.cpp}
     void set_mass(double mass) { mass_ = mass; }
 
     /// Set the atom charge to `charge`.
     ///
-    /// @example{tests/doc/atom/mass.cpp}
+    /// @example{atom/mass.cpp}
     void set_charge(double charge) { charge_ = charge; }
 
     /// Try to get the full atomic name from the atom type.
@@ -100,14 +109,10 @@ public:
     /// atom type: for example, the full name for `He` is `"Helium"`. If no name
     /// can be found, this function returns `nullopt`. This check is executed
     /// with case-insensitive atom type: `Na`, `NA`, `nA` and `na` all get the
-    /// `Na` full name.
+    /// `Na` full name. To change the value returned for a given type, you can
+    /// use configuration files.
     ///
-    /// @verbatim embed:rst:leading-slashes
-    /// This function returna an :cpp:class:`chemfiles::optional` value that is
-    /// close to C++17 ``std::optional``.
-    /// @endverbatim
-    ///
-    /// @example{tests/doc/atom/full_name.cpp}
+    /// @example{atom/full_name.cpp}
     optional<std::string> full_name() const;
 
     /// Try to get the Van der Waals radius from the atom type.
@@ -116,14 +121,10 @@ public:
     /// current atom type: for example, the radius for `He` is 1.4 A. If no
     /// radius can be found, this function returns `nullopt`. This check is
     /// executed with case-insensitive atom type: `Na`, `NA`, `nA` and `na` all
-    /// get the `Na` radius.
+    /// get the `Na` radius. To change the value returned for a given type, you
+    /// can use configuration files.
     ///
-    /// @verbatim embed:rst:leading-slashes
-    /// This function returna an :cpp:class:`chemfiles::optional` value that is
-    /// close to C++17 ``std::optional``.
-    /// @endverbatim
-    ///
-    /// @example{tests/doc/atom/vdw_radius.cpp}
+    /// @example{atom/vdw_radius.cpp}
     optional<double> vdw_radius() const;
 
     /// Try to get the covalent radius from the atom type.
@@ -132,14 +133,10 @@ public:
     /// current atom type: for example, the radius for `He` is 0.32 A. If no
     /// radius can be found, this function returns `nullopt`. This check is
     /// executed with case-insensitive atom type: `Na`, `NA`, `nA` and `na` all
-    /// get the `Na` radius.
+    /// get the `Na` radius. To change the value returned for a given type, you
+    /// can use configuration files.
     ///
-    /// @verbatim embed:rst:leading-slashes
-    /// This function returna an :cpp:class:`chemfiles::optional` value that is
-    /// close to C++17 ``std::optional``.
-    /// @endverbatim
-    ///
-    /// @example{tests/doc/atom/covalent_radius.cpp}
+    /// @example{atom/covalent_radius.cpp}
     optional<double> covalent_radius() const;
 
     /// Try to get the atomic number from the atom type.
@@ -148,35 +145,53 @@ public:
     /// current atom type: for example, the atomic number for `He` is 2. If no
     /// atomic number can be found, this function returns `nullopt`. This check
     /// is executed with case-insensitive atom type: `Na`, `NA`, `nA` and `na`
-    /// all get the `Na` atomic number.
+    /// all get the `Na` atomic number. To change the value returned for a given
+    /// type, you can use configuration files.
     ///
-    /// @verbatim embed:rst:leading-slashes
-    /// This function returna an :cpp:class:`chemfiles::optional` value that is
-    /// close to C++17 ``std::optional``.
-    /// @endverbatim
-    ///
-    /// @example{tests/doc/atom/atomic_number.cpp}
+    /// @example{atom/atomic_number.cpp}
     optional<uint64_t> atomic_number() const;
+
+    /// Get the map of properties associated with this atom. This map might be
+    /// iterated over to list the properties of the atom, or directly accessed.
+    ///
+    /// @example{atom/properties.cpp}
+    const property_map& properties() const {
+        return properties_;
+    }
 
     /// Set an arbitrary `Property` for this atom with the given `name` and
     /// `value`. If a property with this name already exist, it is replaced with
     /// the new value.
     ///
-    /// @example{tests/doc/atom/property.cpp}
-    void set(std::string name, Property value);
+    /// @example{atom/property.cpp}
+    void set(std::string name, Property value) {
+        properties_.set(std::move(name), std::move(value));
+    }
 
     /// Get the `Property` with the given `name` for this atom if it exists.
     ///
     /// If no property with the given `name` is found, this function returns
     /// `nullopt`.
     ///
-    /// @verbatim embed:rst:leading-slashes
-    /// This function returna an :cpp:class:`chemfiles::optional` value that is
-    /// close to C++17 ``std::optional``.
-    /// @endverbatim
+    /// @example{atom/property.cpp}
+    optional<const Property&> get(const std::string& name) const {
+        return properties_.get(name);
+    }
+
+    /// Get the `Property` with the given `name` for this atom if it exists,
+    /// and check that it has the required `kind`.
     ///
-    /// @example{tests/doc/atom/property.cpp}
-    optional<const Property&> get(const std::string& name) const;
+    /// If no property with the given `name` is found, this function returns
+    /// `nullopt`.
+    ///
+    /// If a property with the given `name` is found, but has a different kind,
+    /// this function emits a warning and returns `nullopt`.
+    ///
+    /// @example{atom/property.cpp}
+    template<Property::Kind kind>
+    optional<typename property_metadata<kind>::type> get(const std::string& name) const {
+        return properties_.get<kind>(name);
+    }
 
 private:
     /// the atom name

@@ -1,12 +1,20 @@
 // Chemfiles, a modern library for chemistry file reading and writing
 // Copyright (C) Guillaume Fraux and contributors -- BSD license
 
+#include <cstdint>
 #include <cstring>
+#include <string>
+#include <vector>
+
+#include "chemfiles/capi/types.h"
+#include "chemfiles/capi/misc.h"
+#include "chemfiles/capi/utils.hpp"
+#include "chemfiles/capi/shared_allocator.hpp"
 
 #include "chemfiles/capi/selection.h"
-#include "chemfiles/capi.hpp"
 
-#include "chemfiles/Selections.hpp"
+#include "chemfiles/Selection.hpp"
+
 using namespace chemfiles;
 
 static_assert(
@@ -15,7 +23,7 @@ static_assert(
 );
 
 struct CAPISelection {
-    CAPISelection(Selection select): selection(std::move(select)) {}
+    CAPISelection(std::string string): selection(std::move(string)) {}
     Selection selection;
     std::vector<Match> matches;
 };
@@ -23,22 +31,22 @@ struct CAPISelection {
 extern "C" CHFL_SELECTION* chfl_selection(const char* selection) {
     CHFL_SELECTION* c_selection = nullptr;
     CHFL_ERROR_GOTO(
-        c_selection = new CAPISelection(Selection(std::string(selection)));
+        c_selection = shared_allocator::make_shared<CAPISelection>(selection);
     )
     return c_selection;
 error:
-    delete c_selection;
+    chfl_free(c_selection);
     return nullptr;
 }
 
 extern "C" CHFL_SELECTION* chfl_selection_copy(const CHFL_SELECTION* const selection) {
     CHFL_SELECTION* new_selection = nullptr;
     CHFL_ERROR_GOTO(
-        new_selection = new CAPISelection(Selection(selection->selection.string()));
+        new_selection = shared_allocator::make_shared<CAPISelection>(selection->selection.string());
     )
     return new_selection;
 error:
-    delete new_selection;
+    chfl_free(new_selection);
     return nullptr;
 }
 
@@ -85,9 +93,4 @@ extern "C" chfl_status chfl_selection_matches(const CHFL_SELECTION* const select
             }
         }
     )
-}
-
-extern "C" chfl_status chfl_selection_free(CHFL_SELECTION* const selection) {
-    delete selection;
-    return CHFL_SUCCESS;
 }

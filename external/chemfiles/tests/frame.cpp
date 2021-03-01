@@ -8,10 +8,6 @@ using namespace chemfiles;
 
 constexpr double PI = 3.141592653589793238463;
 
-static bool roughly(double a, double b) {
-    return fabs(a - b) < 1e-12;
-}
-
 TEST_CASE("Frame size") {
     auto frame = Frame();
     CHECK(frame.size() == 0);
@@ -78,7 +74,7 @@ TEST_CASE("Positions and velocities") {
 
     auto positions = frame.positions();
     auto velocities = frame.velocities();
-    for (size_t i=0; i<10; i++){
+    for (size_t i=0; i<10; i++) {
         CHECK(positions[i] == Vector3D(4.0, 3.4, 1.0));
         CHECK((*velocities)[i] == Vector3D(4.0, 3.4, 1.0));
     }
@@ -94,7 +90,7 @@ TEST_CASE("Frame step") {
 TEST_CASE("Unit cell") {
     auto frame = Frame();
     CHECK(frame.cell().shape() == UnitCell::INFINITE);
-    frame.set_cell(UnitCell(10));
+    frame.set_cell(UnitCell({10, 10, 10}));
     CHECK(frame.cell().shape() == UnitCell::ORTHORHOMBIC);
 }
 
@@ -111,7 +107,7 @@ TEST_CASE("Guess topology") {
         frame.add_atom(Atom("O"), {0, 0, 0});
         frame.add_atom(Atom("O"), {1.5, 0, 0});
         frame.add_atom(Atom("H"), {1.5, 1, 0});
-        frame.guess_topology();
+        frame.guess_bonds();
 
         auto bonds = std::vector<Bond>{{0, 1}, {1, 2}, {2, 3}};
         auto angles = std::vector<Angle>{{0, 1, 2}, {1, 2, 3}};
@@ -123,7 +119,7 @@ TEST_CASE("Guess topology") {
 
     SECTION("Methane file") {
         auto frame = Trajectory("data/xyz/methane.xyz").read();
-        frame.guess_topology();
+        frame.guess_bonds();
 
         auto topology = frame.topology();
         CHECK(topology.bonds() == (std::vector<Bond>{{0, 1}, {0, 2}, {0, 3}, {0, 4}}));
@@ -142,13 +138,13 @@ TEST_CASE("Guess topology") {
         CHECK(topology.bonds() == (std::vector<Bond>{{0, 1}, {0, 2}, {0, 3}}));
     }
 
-    SECTION("Cleanup supplementaty H-H bonds") {
+    SECTION("Cleanup supplementary H-H bonds") {
         auto frame = Frame();
         frame.add_atom(Atom("O"), {0, 0, 0});
         frame.add_atom(Atom("H"), {0.2, 0.8, 0});
         frame.add_atom(Atom("H"), {-0.2, 0.8, 0});
 
-        frame.guess_topology();
+        frame.guess_bonds();
         CHECK(frame.topology().bonds() == (std::vector<Bond>{{0, 1}, {0, 2}}));
     }
 
@@ -159,7 +155,7 @@ TEST_CASE("Guess topology") {
         frame.add_atom(Atom("C"), {0.5, 0, 0});
         frame.add_atom(Atom("C"), {-0.5, 0, 0});
 
-        frame.guess_topology();
+        frame.guess_bonds();
         CHECK(frame.topology().bonds() == (std::vector<Bond>{{0, 1}, {0, 2}, {1, 2}}));
         CHECK(frame.topology().angles() == (std::vector<Angle>{{0, 1, 2}, {0, 2, 1}, {1, 0, 2}}));
         CHECK(frame.topology().dihedrals() == (std::vector<Dihedral>{}));
@@ -173,17 +169,27 @@ TEST_CASE("Guess topology") {
         frame.add_atom(Atom("C"), {1.5, 1.5, 0});
         frame.add_atom(Atom("C"), {0, 1.5, 0});
 
-        frame.guess_topology();
+        frame.guess_bonds();
         CHECK(frame.topology().bonds() == (std::vector<Bond>{{0, 1}, {0, 3}, {1, 2}, {2, 3}}));
         CHECK(frame.topology().angles() == (std::vector<Angle>{{0, 1, 2}, {0, 3, 2}, {1, 0, 3}, {1, 2, 3}}));
         CHECK(frame.topology().dihedrals() == (std::vector<Dihedral>{{0, 1, 2, 3}, {1, 0, 3, 2}, {1, 2, 3, 0}, {2, 1, 0, 3}}));
+    }
+
+    SECTION("Bond guessing / Issue #301") {
+        auto frame = Frame();
+        frame.add_atom(Atom("H"), {5.5617326354, 10.1358396373, 9.9055080108});
+        frame.add_atom(Atom("O"), {4.813592106, 8.7324640667, 9.4759788728});
+        frame.add_atom(Atom("O"), {6.2223808696, 10.8616228615, 9.6804566733});
+
+        frame.guess_bonds();
+        CHECK(frame.topology().bonds() == (std::vector<Bond>{{0, 2}}));
     }
 }
 
 TEST_CASE("PBC functions") {
     SECTION("Distance") {
         auto frame = Frame();
-        frame.set_cell(UnitCell(3.0, 4.0, 5.0));
+        frame.set_cell(UnitCell({3.0, 4.0, 5.0}));
         frame.add_atom(Atom(), Vector3D(0, 0, 0));
         frame.add_atom(Atom(), Vector3D(1, 2, 6));
 
@@ -195,10 +201,10 @@ TEST_CASE("PBC functions") {
         frame.add_atom(Atom(), Vector3D(1, 0, 0));
         frame.add_atom(Atom(), Vector3D(0, 0, 0));
         frame.add_atom(Atom(), Vector3D(0, 1, 0));
-        CHECK(roughly(frame.angle(0, 1, 2), PI / 2.0));
+        CHECK(approx_eq(frame.angle(0, 1, 2), PI / 2.0));
 
         frame.add_atom(Atom(), Vector3D(cos(1.877), sin(1.877), 0));
-        CHECK(roughly(frame.angle(0, 1, 3), 1.877));
+        CHECK(approx_eq(frame.angle(0, 1, 3), 1.877));
     }
 
     SECTION("Dihedrals") {
@@ -208,14 +214,14 @@ TEST_CASE("PBC functions") {
         frame.add_atom(Atom(), Vector3D(1, 1, 0));
         frame.add_atom(Atom(), Vector3D(2, 1, 0));
 
-        CHECK(roughly(frame.dihedral(0, 1, 2, 3), PI));
+        CHECK(approx_eq(frame.dihedral(0, 1, 2, 3), PI, 1e-12));
 
         frame.add_atom(Atom(), Vector3D(1.241, 0.444, 0.349));
         frame.add_atom(Atom(), Vector3D(-0.011, -0.441, 0.333));
         frame.add_atom(Atom(), Vector3D(-1.176, 0.296, -0.332));
         frame.add_atom(Atom(), Vector3D(-1.396, 1.211, 0.219));
 
-        CHECK(roughly(frame.dihedral(4, 5, 6, 7), 1.045378962606));
+        CHECK(approx_eq(frame.dihedral(4, 5, 6, 7), 1.045378962606, 1e-12));
     }
 
     SECTION("Out of plane") {
@@ -226,10 +232,18 @@ TEST_CASE("PBC functions") {
         frame.add_atom(Atom(), Vector3D(0, 1, 0));
 
         CHECK(frame.out_of_plane(0, 1, 2, 3) == 2);
+
+        frame = Frame();
+        frame.add_atom(Atom(), Vector3D(0, 0, 0));
+        frame.add_atom(Atom(), Vector3D(0, 1, 0));
+        frame.add_atom(Atom(), Vector3D(0, 0, 1));
+        frame.add_atom(Atom(), Vector3D(0, 0, -1));
+
+        CHECK(frame.out_of_plane(0, 1, 2, 3) == 0);
     }
 }
 
-TEST_CASE("Property map") {
+TEST_CASE("Properties") {
     auto frame = Frame();
     frame.set("foo", 35);
     frame.set("bar", false);
@@ -240,4 +254,43 @@ TEST_CASE("Property map") {
     frame.set("foo", "test");
     CHECK(frame.get("foo")->as_string() == "test");
     CHECK_FALSE(frame.get("not here"));
+
+    // Iterate over all properties
+    frame.set("buzz", 22);
+    frame.set("fizz", Vector3D(1, 2, 3));
+    for(auto it: frame.properties()) {
+        auto name = it.first;
+        if (name == "bar") {
+            CHECK(it.second.as_bool() == false);
+        } else if (name == "foo") {
+            CHECK(it.second.as_string() == "test");
+        } else if (name == "buzz") {
+            CHECK(it.second.as_double() == 22);
+        } else if (name == "fizz") {
+            CHECK(it.second.as_vector3d() == Vector3D(1, 2, 3));
+        } else {
+            CHECK(false);  // all case should have been covered
+        }
+    }
+
+    // Typed access to properties
+    CHECK(frame.get<Property::BOOL>("bar").value() == false);
+    CHECK_FALSE(frame.get<Property::STRING>("bar"));
+    CHECK_FALSE(frame.get<Property::DOUBLE>("bar"));
+    CHECK_FALSE(frame.get<Property::VECTOR3D>("bar"));
+
+    CHECK(frame.get<Property::STRING>("foo").value() == "test");
+    CHECK_FALSE(frame.get<Property::BOOL>("foo"));
+    CHECK_FALSE(frame.get<Property::DOUBLE>("foo"));
+    CHECK_FALSE(frame.get<Property::VECTOR3D>("foo"));
+
+    CHECK(frame.get<Property::DOUBLE>("buzz").value() == 22);
+    CHECK_FALSE(frame.get<Property::BOOL>("buzz"));
+    CHECK_FALSE(frame.get<Property::STRING>("buzz"));
+    CHECK_FALSE(frame.get<Property::VECTOR3D>("buzz"));
+
+    CHECK(frame.get<Property::VECTOR3D>("fizz").value() == Vector3D(1, 2, 3));
+    CHECK_FALSE(frame.get<Property::BOOL>("fizz"));
+    CHECK_FALSE(frame.get<Property::STRING>("fizz"));
+    CHECK_FALSE(frame.get<Property::DOUBLE>("fizz"));
 }

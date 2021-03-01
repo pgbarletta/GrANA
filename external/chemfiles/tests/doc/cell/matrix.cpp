@@ -9,7 +9,7 @@ using namespace chemfiles;
 
 TEST_CASE() {
     // [example]
-    auto cell = UnitCell(11, 22, 33);
+    auto cell = UnitCell({11, 22, 33});
     auto matrix = cell.matrix();
 
     assert(matrix[0][0] == 11);
@@ -20,8 +20,8 @@ TEST_CASE() {
     assert(fabs(matrix[0][2]) < 1e-12);
     assert(fabs(matrix[1][2]) < 1e-12);
 
-    assert(matrix[1][0] == 0);
-    assert(matrix[2][0] == 0);
-    assert(matrix[2][1] == 0);
+    assert(fabs(matrix[1][0]) < 1e-12);
+    assert(fabs(matrix[2][0]) < 1e-12);
+    assert(fabs(matrix[2][1]) < 1e-12);
     // [example]
 }

@@ -5,7 +5,14 @@ Pre-compiled binaries
 ^^^^^^^^^^^^^^^^^^^^^
 
 We provide compiled packages of the latest release for muliple Linux
-distributions using the `OpenSUSE build service`_.
+distributions using the `OpenSUSE build service`_. The name of packages
+you can install this way follow the usual linux naming scheme:
+
+- ``chemfiles`` package only contains the shared library ``libchemfiles.so.x.y``
+- ``chemfiles-static`` contains the static library ``libchemfiles.a``
+- ``chemfiles-dev`` (for Debian and derivatives) or ``chemfiles-devel``
+  (for CentOS and derivatives) contains the files usefull for
+  development, including cmake configuration and the C and C++ headers.
 
 .. raw:: html
     <p>You can download them directly below:</p>
@@ -34,7 +41,7 @@ Linux and Os X.
     # Get the C++ and C library
     conda install -c conda-forge chemfiles-lib
 
-.. _conda: https://conda.pydata.org/docs/
+.. _conda: https://conda.io/
 .. _OpenSUSE build service: https://software.opensuse.org/download.html?project=home%3ALuthaf&package=chemfiles
 
 Building from sources
@@ -49,16 +56,9 @@ Core library dependencies
 In order to build the core library, you will need a C++11 capable compiler.
 Chemfiles is automatically tested agaist GCC (>= 4.8) on Linux, OSX and Windows
 (mingw-w64); clang (>= 3.3) on Linux and OS X and MSCV 14 on Windows. It was
-also compiled sucessfully with Intel C++ compilers. Please report any sucessfull
-compilation with other compilers!
-
-Some optional functionalities of chemfiles needs aditional library:
-
-* The `NetCDF`_ library is needed to read and write the AMBER NetCDF format.
-  It is available in all the package managers.
-
-Finally, chemfiles needs uses the `CMake`_ build system, which is available in
-all the package managers.
+also compiled sucessfuly with Intel C++ compilers. Please report any sucessful
+compilation with other compilers! Chemfiles also uses the `CMake`_ build system,
+which is available in all the package managers.
 
 On UNIX-like systems (Linux, OS X, ...)
 """""""""""""""""""""""""""""""""""""""
@@ -69,29 +69,26 @@ All these dependencies can be installed in one command:
 
     # On apt-get based distributions
     apt-get update
-    apt-get install cmake libnetcdf-dev
+    apt-get install build-essential cmake
 
     # On yum based distribution (CentOS/RHEL)
-    yum install epel-release # The EPEL repository contains the netcdf lib
-    yum install cmake netcdf-devel
+    yum install gcc gcc-c++ make cmake
 
     # On dnf based distribution (Fedora)
-    dnf install cmake netcdf-devel
+    dnf install @development-tools cmake
 
     # On OS X with Homebrew
-    brew tap homebrew/science
-    brew install cmake netcdf
+    brew install cmake
 
-.. _NetCDF: https://www.unidata.ucar.edu/software/netcdf/
 .. _CMake: https://cmake.org/
 
 On Windows
 """"""""""
 
-You can use either MSVC 2015 compiler, or `mingw-w64`_ provided gcc. `MSYS2`_
-offer a package manager to install all the needed libraries. I recomend using it
-if you have no preference over your compiler. After the initial installation
-steps, you can run the following to install a recent C++ compiler:
+You can use either MSVC 2015 compiler, or gcc as provided by `mingw`_.
+`MSYS2`_ offer a package manager to install all the needed libraries. After the
+initial installation steps, you can run the following to install a recent C++
+compiler:
 
 .. code-block:: bash
 
@@ -101,10 +98,10 @@ steps, you can run the following to install a recent C++ compiler:
     # On 32-bits windows
     pacman -S mingw32/mingw-w64-i686-gcc
 
-You will also need to install cmake, which can be found `here <https://www.cmake.org/download/>`_.
+You will also need to install cmake, which can be found `here <https://cmake.org/download/>`_.
 
-.. _mingw-w64: https://mingw-w64.org/doku.php
-.. _MSYS2: https://msys2.github.io/
+.. _mingw: http://www.mingw.org/
+.. _MSYS2: https://www.msys2.org/
 
 Build steps
 -----------
@@ -159,8 +156,13 @@ most important options:
 | ``-DCHFL_SYSTEM_NETCDF=ON|OFF``       | ``OFF``             | Use the system-provided      |
 |                                       |                     | netcdf library.              |
 +---------------------------------------+---------------------+------------------------------+
+| ``-DCHFL_SYSTEM_LZMA=ON|OFF``         | ``OFF``             | Use the system-provided      |
+|                                       |                     | lzma library.                |
++---------------------------------------+---------------------+------------------------------+
+| ``-DCHFL_SYSTEM_ZLIB=ON|OFF``         | ``OFF``             | Use the system-provided zlib |
++---------------------------------------+---------------------+------------------------------+
 
-For instance, to install to :file:`$HOME/local`, use:
+For instance, to install chemfiles to :file:`$HOME/local`, you should use:
 
 .. code-block:: bash
 
@@ -191,7 +193,7 @@ code depending on chemfiles with the following command
 
     # change <PREFIX> to the location where you installed chemfiles
     # (default is /usr/local)
-    g++ -I <PREFIX>/include my-code.cpp -o my-code -lchemfiles -L <PREFIX>/lib
+    g++ my-code.cpp -o my-code -I<PREFIX>/include -lchemfiles -L<PREFIX>/lib
 
 Here, ``-I <PREFIX>/include`` tells the compiler where to look for chemfiles
 headers, ``-lchemfiles`` tells it to link the chemfiles library in the final

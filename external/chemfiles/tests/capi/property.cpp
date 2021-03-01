@@ -6,6 +6,21 @@
 #include "chemfiles.h"
 
 TEST_CASE("Property") {
+    SECTION("Constructors errors") {
+        fail_next_allocation();
+        CHECK(chfl_property_bool(false) == nullptr);
+
+        fail_next_allocation();
+        CHECK(chfl_property_double(42) == nullptr);
+
+        fail_next_allocation();
+        CHECK(chfl_property_string("foo") == nullptr);
+
+        chfl_vector3d initial = {1, 3, 4};
+        fail_next_allocation();
+        CHECK(chfl_property_vector3d(initial) == nullptr);
+    }
+
     SECTION("Bool") {
         CHFL_PROPERTY* property = chfl_property_bool(false);
         REQUIRE(property);
@@ -25,7 +40,7 @@ TEST_CASE("Property") {
         CHECK_STATUS(chfl_property_get_kind(property, &kind));
         CHECK(kind == CHFL_PROPERTY_BOOL);
 
-        CHECK_STATUS(chfl_property_free(property));
+        chfl_free(property);
     }
 
     SECTION("Double") {
@@ -47,7 +62,7 @@ TEST_CASE("Property") {
         CHECK_STATUS(chfl_property_get_kind(property, &kind));
         CHECK(kind == CHFL_PROPERTY_DOUBLE);
 
-        CHECK_STATUS(chfl_property_free(property));
+        chfl_free(property);
     }
 
     SECTION("String") {
@@ -69,7 +84,7 @@ TEST_CASE("Property") {
         CHECK_STATUS(chfl_property_get_kind(property, &kind));
         CHECK(kind == CHFL_PROPERTY_STRING);
 
-        CHECK_STATUS(chfl_property_free(property));
+        chfl_free(property);
     }
 
     SECTION("Vector3D") {
@@ -94,6 +109,6 @@ TEST_CASE("Property") {
         CHECK_STATUS(chfl_property_get_kind(property, &kind));
         CHECK(kind == CHFL_PROPERTY_VECTOR3D);
 
-        CHECK_STATUS(chfl_property_free(property));
+        chfl_free(property);
     }
 }

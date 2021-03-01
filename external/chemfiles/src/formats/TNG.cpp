@@ -1,17 +1,52 @@
 // Chemfiles, a modern library for chemistry file reading and writing
 // Copyright (C) Guillaume Fraux and contributors -- BSD license
 
-#include "chemfiles/formats/TNG.hpp"
-#include "chemfiles/files/TNGFile.hpp"
+#include <cmath>
+#include <cstdlib>
+#include <cstdint>
+#include <array>
+#include <string>
+#include <vector>
+#include <cassert>
 
+#include <tng/tng_io.h>
+
+#include "chemfiles/types.hpp"
+#include "chemfiles/error_fmt.hpp"
+#include "chemfiles/external/optional.hpp"
+#include "chemfiles/external/span.hpp"
+
+#include "chemfiles/File.hpp"
+#include "chemfiles/Atom.hpp"
 #include "chemfiles/Frame.hpp"
-#include "chemfiles/ErrorFmt.hpp"
+#include "chemfiles/Residue.hpp"
+#include "chemfiles/Topology.hpp"
+#include "chemfiles/UnitCell.hpp"
+#include "chemfiles/FormatMetadata.hpp"
+
+#include "chemfiles/files/TNGFile.hpp"
+#include "chemfiles/formats/TNG.hpp"
+
 using namespace chemfiles;
 
-template<> FormatInfo chemfiles::format_information<TNGFormat>() {
-    return FormatInfo("TNG").with_extension(".tng").description(
-        "Trajectory New Generation binary format"
-    );
+template<> const FormatMetadata& chemfiles::format_metadata<TNGFormat>() {
+    static FormatMetadata metadata;
+    metadata.name = "TNG";
+    metadata.extension = ".tng";
+    metadata.description = "Trajectory Next Generation binary format";
+    metadata.reference = "http://doi.wiley.com/10.1002/jcc.23495";
+
+    metadata.read = true;
+    metadata.write = false;
+    metadata.memory = false;
+
+    metadata.positions = true;
+    metadata.velocities = true;
+    metadata.unit_cell = true;
+    metadata.atoms = true;
+    metadata.bonds = true;
+    metadata.residues = true;
+    return metadata;
 }
 
 /// A buffer for TNG allocated data. It will not allocate its own memory, but
@@ -41,20 +76,58 @@ private:
 #define STRING(x) STRING_0(x)
 #define CHECK(x) check_tng_error((x), (STRING(x)))
 
-TNGFormat::TNGFormat(const std::string& path, File::Mode mode): tng_(path, mode) {}
+TNGFormat::TNGFormat(std::string path, File::Mode mode, File::Compression compression): tng_(std::move(path), mode) {
+    if (compression != File::DEFAULT) {
+        throw format_error("TNG format do not support compression");
+    }
+
+    int64_t exp = -1;
+    CHECK(tng_distance_unit_exponential_get(tng_, &exp));
+    // calculate the scale factor from a given length scale to angstrom
+    distance_scale_factor_ = pow(10.0, static_cast<double>(exp) + 10.0);
+
+    // work around a bug in tng_num_frames_get (https://redmine.gromacs.org/issues/2937)
+    // manually query all frames in the trajectory, and get the corresponding
+    // TNG frame number in tng_steps_
+    int64_t current_frame = -1;
+    int64_t next_frame = 0;
+    int64_t unused = 0;
+    int64_t* buffer = nullptr;
+
+    tng_function_status status = TNG_SUCCESS;
+    while (true) {
+        // Look for all frames with at least position data
+        int64_t block_ids[] = {TNG_TRAJ_POSITIONS};
+        status = tng_util_trajectory_next_frame_present_data_blocks_find(
+            tng_, current_frame, 1, block_ids, &next_frame, &unused, &buffer
+        );
+
+        if (status == TNG_SUCCESS) {
+            current_frame = next_frame;
+            tng_steps_.push_back(current_frame);
+        } else if (status == TNG_FAILURE) {
+            // We found the end of the file
+            break;
+        } else {
+            // TNG_CRITICAL: throw error
+            check_tng_error(status, "tng_util_trajectory_next_frame_present_data_blocks_find");
+        }
+    }
+
+    free(buffer);
+}
 
 size_t TNGFormat::nsteps() {
-    int64_t n_frames = 0;
-    CHECK(tng_num_frames_get(tng_, &n_frames));
-    return static_cast<size_t>(n_frames);
+    return tng_steps_.size();
 }
 
 void TNGFormat::read_step(size_t step, Frame& frame) {
-    step_ = static_cast<int64_t>(step);
+    step_ = step;
     read(frame);
 }
 
 void TNGFormat::read(Frame& frame) {
+    frame.set_step(static_cast<size_t>(tng_steps_[step_]));
     natoms_ = 0;
     CHECK(tng_num_particles_get(tng_, &natoms_));
     assert(natoms_ > 0);
@@ -72,13 +145,15 @@ void TNGFormat::read_positions(Frame& frame) {
     TngBuffer<float> buffer;
     int64_t unused = 0;
 
-    CHECK(tng_util_pos_read_range(tng_, step_, step_, buffer.ptr(), &unused));
+    CHECK(tng_util_pos_read_range(
+        tng_, tng_steps_[step_], tng_steps_[step_], buffer.ptr(), &unused
+    ));
 
     auto positions = frame.positions();
     for (size_t i=0; i<static_cast<size_t>(natoms_); i++) {
-        positions[i][0] = buffer[3*i + 0];
-        positions[i][1] = buffer[3*i + 1];
-        positions[i][2] = buffer[3*i + 2];
+        positions[i][0] = static_cast<double>(buffer[3 * i + 0]) * distance_scale_factor_;
+        positions[i][1] = static_cast<double>(buffer[3 * i + 1]) * distance_scale_factor_;
+        positions[i][2] = static_cast<double>(buffer[3 * i + 2]) * distance_scale_factor_;
     }
 }
 
@@ -87,7 +162,7 @@ void TNGFormat::read_velocities(Frame& frame) {
     int64_t unused = 0;
 
     auto status = tng_util_vel_read_range(
-        tng_, step_, step_, buffer.ptr(), &unused
+        tng_, tng_steps_[step_], tng_steps_[step_], buffer.ptr(), &unused
     );
 
     switch (status) {
@@ -106,9 +181,9 @@ void TNGFormat::read_velocities(Frame& frame) {
     frame.add_velocities();
     auto velocities = *frame.velocities();
     for (size_t i=0; i<static_cast<size_t>(natoms_); i++) {
-        velocities[i][0] = buffer[3*i + 0];
-        velocities[i][1] = buffer[3*i + 1];
-        velocities[i][2] = buffer[3*i + 2];
+        velocities[i][0] = static_cast<double>(buffer[3 * i + 0]) * distance_scale_factor_;
+        velocities[i][1] = static_cast<double>(buffer[3 * i + 1]) * distance_scale_factor_;
+        velocities[i][2] = static_cast<double>(buffer[3 * i + 2]) * distance_scale_factor_;
     }
 }
 
@@ -117,7 +192,7 @@ void TNGFormat::read_cell(Frame& frame) {
     int64_t unused = 0;
 
     auto status = tng_util_box_shape_read_range(
-        tng_, step_, step_, buffer.ptr(), &unused
+        tng_, tng_steps_[step_], tng_steps_[step_], buffer.ptr(), &unused
     );
 
     switch (status) {
@@ -134,23 +209,13 @@ void TNGFormat::read_cell(Frame& frame) {
         );
     }
 
-    auto a = Vector3D(buffer[0], buffer[1], buffer[2]);
-    auto b = Vector3D(buffer[3], buffer[4], buffer[5]);
-    auto c = Vector3D(buffer[6], buffer[7], buffer[8]);
+    auto matrix = distance_scale_factor_ * Matrix3D(
+        static_cast<double>(buffer[0]), static_cast<double>(buffer[3]), static_cast<double>(buffer[6]),
+        static_cast<double>(buffer[1]), static_cast<double>(buffer[4]), static_cast<double>(buffer[7]),
+        static_cast<double>(buffer[2]), static_cast<double>(buffer[5]), static_cast<double>(buffer[8])
+    );
 
-    auto angle = [](const Vector3D& u, const Vector3D& v) {
-        constexpr double PI = 3.141592653589793238463;
-        auto cos = dot(u, v) / (u.norm() * v.norm());
-        cos = std::max(-1., std::min(1., cos));
-        return acos(cos) * 180.0 / PI;
-    };
-
-    double alpha = angle(b, c);
-    double beta = angle(a, c);
-    double gamma = angle(a, b);
-
-    // Factor 10 because the cell lengthes are in nm in the TNG format
-    frame.set_cell({a.norm() * 10, b.norm() * 10, c.norm() * 10, alpha, beta, gamma});
+    frame.set_cell(UnitCell(matrix));
 }
 
 void TNGFormat::read_topology(Frame& frame) {

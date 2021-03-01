@@ -4,13 +4,13 @@
 #ifndef CHEMFILES_PROPERTY_HPP
 #define CHEMFILES_PROPERTY_HPP
 
+#include <new>
 #include <string>
 #include <unordered_map>
 
-#include "chemfiles/exports.hpp"
 #include "chemfiles/types.hpp"
+#include "chemfiles/exports.h"
 #include "chemfiles/unreachable.hpp"
-#include "chemfiles/Error.hpp"
 #include "chemfiles/external/optional.hpp"
 
 namespace chemfiles {
@@ -20,8 +20,8 @@ namespace chemfiles {
 /// `Vector3D`.
 class CHFL_EXPORT Property final {
 public:
-    /// Possible types holded by a property
-    enum kind {
+    /// Possible types held by a property
+    enum Kind {
         BOOL = 0,
         DOUBLE = 1,
         STRING = 2,
@@ -29,56 +29,56 @@ public:
     };
 
     /// Create a property holding a boolean value.
-    /// @example{tests/doc/property/bool.cpp}
-    Property(bool value): kind_(BOOL), bool_(value) {}
+    /// @example{property/bool.cpp}
+    Property(bool value): kind_(BOOL), bool_(value) {} // NOLINT: not all members are initialized
 
     /// Create a property holding a double value.
-    /// @example{tests/doc/property/double.cpp}
-    Property(double value): kind_(DOUBLE), double_(value) {}
+    /// @example{property/double.cpp}
+    Property(double value): kind_(DOUBLE), double_(value) {} // NOLINT: not all members are initialized
 
     /// Create a property holding a `Vector3D` value.
-    /// @example{tests/doc/property/vector3d.cpp}
-    Property(Vector3D value): kind_(VECTOR3D), vector3d_(value) {}
+    /// @example{property/vector3d.cpp}
+    Property(Vector3D value): kind_(VECTOR3D), vector3d_(value) {} // NOLINT: not all members are initialized
 
     /// Create a property holding a string value.
-    /// @example{tests/doc/property/string.cpp}
-    Property(std::string value): kind_(STRING), string_(std::move(value)) {}
+    /// @example{property/string.cpp}
+    Property(std::string value): kind_(STRING), string_(std::move(value)) {} // NOLINT: not all members are initialized
 
     // ==== The following construtors are here to help with overloading
     // ==== resolution.
     /// Create a property holding a string value from a const char*.
-    /// @example{tests/doc/property/string.cpp}
-    Property(const char* value): kind_(STRING), string_(value) {}
+    /// @example{property/string.cpp}
+    Property(const char* value): kind_(STRING), string_(value) {} // NOLINT: not all members are initialized
 
     /// Create a property holding a double value from an int.
-    /// @example{tests/doc/property/double.cpp}
-    Property(int value): kind_(DOUBLE), double_(static_cast<double>(value)) {}
+    /// @example{property/double.cpp}
+    Property(int value): kind_(DOUBLE), double_(static_cast<double>(value)) {} // NOLINT: not all members are initialized
 
     /// Create a property holding a double value from a long.
-    /// @example{tests/doc/property/double.cpp}
-    Property(long value): kind_(DOUBLE), double_(static_cast<double>(value)) {}
+    /// @example{property/double.cpp}
+    Property(long value): kind_(DOUBLE), double_(static_cast<double>(value)) {} // NOLINT: not all members are initialized
 
     /// Create a property holding a double value from a long long.
-    /// @example{tests/doc/property/double.cpp}
-    Property(long long value): kind_(DOUBLE), double_(static_cast<double>(value)) {}
+    /// @example{property/double.cpp}
+    Property(long long value): kind_(DOUBLE), double_(static_cast<double>(value)) {} // NOLINT: not all members are initialized
 
     /// Create a property holding a double value from an unsigned.
-    /// @example{tests/doc/property/double.cpp}
-    Property(unsigned value): kind_(DOUBLE), double_(static_cast<double>(value)) {}
+    /// @example{property/double.cpp}
+    Property(unsigned value): kind_(DOUBLE), double_(static_cast<double>(value)) {} // NOLINT: not all members are initialized
 
     /// Create a property holding a double value from an unsigned long.
-    /// @example{tests/doc/property/double.cpp}
-    Property(unsigned long value): kind_(DOUBLE), double_(static_cast<double>(value)) {}
+    /// @example{property/double.cpp}
+    Property(unsigned long value): kind_(DOUBLE), double_(static_cast<double>(value)) {} // NOLINT: not all members are initialized
 
     /// Create a property holding a double value from an unsigned long long.
-    /// @example{tests/doc/property/double.cpp}
-    Property(unsigned long long value): kind_(DOUBLE), double_(static_cast<double>(value)) {}
+    /// @example{property/double.cpp}
+    Property(unsigned long long value): kind_(DOUBLE), double_(static_cast<double>(value)) {} // NOLINT: not all members are initialized
 
     Property(const Property& other): Property(false) {
         *this = other;
     }
 
-    Property(Property&& other): Property(false) {
+    Property(Property&& other) noexcept: Property(false) {
         *this = std::move(other);
     }
 
@@ -87,7 +87,7 @@ public:
         this->kind_ = other.kind_;
         switch (this->kind_) {
         case BOOL:
-            new(&this->bool_) bool(other.bool_);
+            new (&this->bool_) bool(other.bool_);
             break;
         case DOUBLE:
             new (&this->double_) double(other.double_);
@@ -102,12 +102,12 @@ public:
         return *this;
     }
 
-    Property& operator=(Property&& other) {
+    Property& operator=(Property&& other) noexcept {
         this->~Property();
         this->kind_ = other.kind_;
         switch (this->kind_) {
         case BOOL:
-            new(&this->bool_) bool(other.bool_);
+            new (&this->bool_) bool(other.bool_);
             break;
         case DOUBLE:
             new (&this->double_) double(other.double_);
@@ -129,46 +129,46 @@ public:
         }
     }
 
-    /// Get the kind of property, *i.e.* the type of the holded value
+    /// Get the kind of property, *i.e.* the type of the held value
     ///
-    /// @example{tests/doc/property/get_kind.cpp}
-    kind get_kind() const {
+    /// @example{property/get_kind.cpp}
+    Kind kind() const {
         return this->kind_;
     }
 
     /// Get the boolean value stored in this Property
     ///
-    /// @example{tests/doc/property/as_bool.cpp}
+    /// @example{property/as_bool.cpp}
     ///
     /// @throws PropertyError if this property does not hold a boolean value
     bool as_bool() const;
 
     /// Get the double value stored in this Property
     ///
-    /// @example{tests/doc/property/as_double.cpp}
+    /// @example{property/as_double.cpp}
     ///
     /// @throws PropertyError if this property does not hold a double value
     double as_double() const;
 
     /// Get the Vector3D value stored in this Property
     ///
-    /// @example{tests/doc/property/as_vector3d.cpp}
+    /// @example{property/as_vector3d.cpp}
     ///
     /// @throws PropertyError if this property does not hold a Vector3D value
     Vector3D as_vector3d() const;
 
     /// Get the string value stored in this Property
     ///
-    /// @example{tests/doc/property/as_string.cpp}
+    /// @example{property/as_string.cpp}
     ///
     /// @throws PropertyError if this property does not hold a string value
     const std::string& as_string() const;
 
-private:
-    /// Get the kind name as a string
-    std::string kind_as_string() const;
+    /// Get the given kind name as a string
+    static std::string kind_as_string(Kind kind);
 
-    kind kind_;
+private:
+    Kind kind_;
     union {
         bool bool_;
         std::string string_;
@@ -200,10 +200,57 @@ inline bool operator!=(const Property& lhs, const Property& rhs) {
     return !(lhs == rhs);
 }
 
+/// Various metadata associated with a given kind, accessible at compile time
+template<Property::Kind kind>
+struct property_metadata {
+    /// Type of the property
+    using type = void;
+    /// Extract the value of the property
+    static type extract(const Property&);
+};
+
+template<>
+struct property_metadata<Property::BOOL> {
+    using type = bool;
+    static type extract(const Property& property) {
+        return property.as_bool();
+    }
+};
+
+template<>
+struct property_metadata<Property::DOUBLE> {
+    using type = double;
+    static type extract(const Property& property) {
+        return property.as_double();
+    }
+};
+
+template<>
+struct property_metadata<Property::STRING> {
+    using type = const std::string&;
+    static type extract(const Property& property) {
+        return property.as_string();
+    }
+};
+
+template<>
+struct property_metadata<Property::VECTOR3D> {
+    using type = Vector3D;
+    static type extract(const Property& property) {
+        return property.as_vector3d();
+    }
+};
+
 /// A property map for inclusion in a Frame or an Atom.
-class property_map final {
+class CHFL_EXPORT property_map final {
 public:
+    using iterator = std::unordered_map<std::string, Property>::const_iterator;
+
     property_map() = default;
+    property_map(property_map&&) = default;
+    property_map& operator=(property_map&&) = default;
+    property_map(const property_map&) = default;
+    property_map& operator=(const property_map&) = default;
 
     /// Set an arbitrary property with the given `name` and `value`. If a
     /// property with this name already exist, it is replaced with the new
@@ -212,6 +259,24 @@ public:
 
     /// Get the property with the given `name` if it exists.
     optional<const Property&> get(const std::string& name) const;
+
+    template<Property::Kind kind>
+    optional<typename property_metadata<kind>::type> get(const std::string& name) const;
+
+    /// Get the number of properties in this property map
+    size_t size() const {
+        return data_.size();
+    }
+
+    /// Get an iterator to the first property in the property map
+    iterator begin() const {
+        return data_.begin();
+    }
+
+    /// Get an iterator to the end of properties
+    iterator end() const {
+        return data_.end();
+    }
 
 private:
     std::unordered_map<std::string, Property> data_;
@@ -225,6 +290,12 @@ inline bool operator==(const property_map& lhs, const property_map& rhs) {
 inline bool operator!=(const property_map& lhs, const property_map& rhs) {
     return !(lhs == rhs);
 }
+
+// Declare instantiations of the typed `property_map::get` template
+extern template CHFL_EXPORT optional<bool> property_map::get<Property::BOOL>(const std::string& name) const;
+extern template CHFL_EXPORT optional<double> property_map::get<Property::DOUBLE>(const std::string& name) const;
+extern template CHFL_EXPORT optional<const std::string&> property_map::get<Property::STRING>(const std::string& name) const;
+extern template CHFL_EXPORT optional<Vector3D> property_map::get<Property::VECTOR3D>(const std::string& name) const;
 
 } // namespace chemfiles
 
