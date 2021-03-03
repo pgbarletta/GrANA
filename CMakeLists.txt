@@ -26,6 +26,7 @@ target_sources(grana
         src/grid.cpp
         src/grid_base.cpp
         src/octree.cpp
+        src/PDB.cpp
         include/GrANA/utils.hpp
         include/GrANA/continuous_primitives.hpp
         include/GrANA/continuous_base.hpp
@@ -34,6 +35,7 @@ target_sources(grana
         include/GrANA/grid_base.hpp
         include/GrANA/grid.hpp
         include/GrANA/octree.hpp
+        include/GrANA/PDB.hpp
 )
 
 message("${Magenta}Trying to automatically locate CGAL, gmp and mpfr libraries.${ColourReset}")
@@ -47,7 +49,10 @@ add_subdirectory(external/chemfiles EXCLUDE_FROM_ALL)
 target_link_libraries(grana PRIVATE chemfiles)
 
 message("${Magenta}Using chemfiles's fmt header-only library.${ColourReset}")
-include_directories(build/external/chemfiles/external/fmt)
+include_directories(build/external/chemfiles/external/fmt/include)
+
+# find_package(fmt)
+# target_link_libraries(<your-target> fmt::fmt)
 
 target_include_directories(grana
     PRIVATE
