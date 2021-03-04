@@ -1,4 +1,5 @@
 #include "GrANA/utils.hpp"
+
 namespace GrANA {
 
 // Read input.
@@ -12,9 +13,7 @@ auto get_input(int argc, char **argv)
                 "Usage: GrANA resolution in_pdb out_pdb\n");
         }
         r = std::stof(argv[1]);
-    } catch (...) {
-        std::terminate();
-    }
+    } catch (...) { std::terminate(); }
 
     return {argv[2], argv[3], r};
 }
