@@ -9,7 +9,7 @@ Octree::Octree(
     _natoms(in_mol._natoms), _resolution(resolution),
     _bucket_size(bucket_size) {
 
-    _orig_vtor = Vector(std::floor(in_mol._x[_idx_x[0]]),
+    _origin = Vector(std::floor(in_mol._x[_idx_x[0]]),
         std::floor(in_mol._y[_idx_y[0]]), std::floor(in_mol._z[_idx_z[0]]));
 
     _x.reserve(_natoms * 3);
@@ -18,12 +18,9 @@ Octree::Octree(
     _radii.reserve(_natoms);
 
     for (int i = 0; i < _natoms; ++i) {
-        grid_t const x =
-            cont_to_grid(in_mol._x[i] - _orig_vtor[0], _resolution);
-        grid_t const y =
-            cont_to_grid(in_mol._y[i] - _orig_vtor[1], _resolution);
-        grid_t const z =
-            cont_to_grid(in_mol._z[i] - _orig_vtor[2], _resolution);
+        grid_t const x = cont_to_grid(in_mol._x[i] - _origin[0], _resolution);
+        grid_t const y = cont_to_grid(in_mol._y[i] - _origin[1], _resolution);
+        grid_t const z = cont_to_grid(in_mol._z[i] - _origin[2], _resolution);
 
         if (x < _start[0])
             _start[0] = x;
@@ -49,11 +46,12 @@ Octree::Octree(
     // don't mind the rounding.
     _center = {(_sizes[0]) / 2, (_sizes[1]) / 2, (_sizes[2]) / 2};
 
-    _root = newOctant(molecula._start[0], molecula._start[1],
-        molecula._start[2], molecula._end[0], molecula._end[1],
-        molecula._end[2], molecula._center, _x_sorted.begin(), _x_sorted.end(),
-        _y_sorted.begin(), _y_sorted.end(), _z_sorted.begin(), _z_sorted.end());
-    1;
+    // _root = newOctant(molecula._start[0], molecula._start[1],
+    //     molecula._start[2], molecula._end[0], molecula._end[1],
+    //     molecula._end[2], molecula._center, _x_sorted.begin(),
+    //     _x_sorted.end(), _y_sorted.begin(), _y_sorted.end(),
+    //     _z_sorted.begin(), _z_sorted.end());
+
     return;
 }
 

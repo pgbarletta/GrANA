@@ -35,12 +35,9 @@ public:
         octant->_end = {x_max, y_max, z_max};
         octant->_natoms = natoms;
 
-        auto const x_medio =
-            std::lower_bound(x_sorted.begin(), x_sorted.end(), center[0]);
-        auto const y_medio =
-            std::lower_bound(y_sorted.begin(), y_sorted.end(), center[1]);
-        auto const z_medio =
-            std::lower_bound(z_sorted.begin(), z_sorted.end(), center[2]);
+        auto const x_medio = std::lower_bound(x_begin, x_end, center[0]);
+        auto const y_medio = std::lower_bound(y_begin, y_end, center[1]);
+        auto const z_medio = std::lower_bound(z_begin, z_end, center[2]);
 
         return octant;
     }
@@ -52,7 +49,7 @@ public:
     int const _natoms;
 
     // Origin coordinates.
-    Vector _orig_vtor{0.0f, 0.0f, 0.0f};
+    Vector _origin {0.0f, 0.0f, 0.0f};
 
     // Atoms coordinates. Using SoA.
     std::vector<grid_t> _x, _y, _z;
@@ -62,9 +59,9 @@ public:
 
     // Min and max coordinates for each axis. Can be used to get main cube's
     // vertices coordinates.
-    std::array<grid_t, 3> _start{std::numeric_limits<grid_t>::max(),
+    std::array<grid_t, 3> _start {std::numeric_limits<grid_t>::max(),
         std::numeric_limits<grid_t>::max(), std::numeric_limits<grid_t>::max()},
-        _end{std::numeric_limits<grid_t>::min(),
+        _end {std::numeric_limits<grid_t>::min(),
             std::numeric_limits<grid_t>::min(),
             std::numeric_limits<grid_t>::min()};
 
