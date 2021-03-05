@@ -3,7 +3,7 @@
 
 #include <GrANA/continuous_primitives.hpp>
 #include <array>
-#include <fmt/format.h>
+
 namespace GrANA {
 
 class Triangle {
@@ -13,16 +13,13 @@ public:
     Triangle(float const x0, float const y0, float const z0, float const x1,
         float const y1, float const z1, float const x2, float const y2,
         float const z2) :
-        _p({Point(x0, y0, z0), Point(x1, y1, z1), Point(x2, y2, z2)}) {}
+        _p({Point(x0, y0, z0), Point(x1, y1, z1), Point(x2, y2, z2)}) { }
 
     // From GrANA::Point
     Triangle(Point const &p0, Point const &p1, Point const &p2) :
-        _p({p0, p1, p2}) {}
+        _p({p0, p1, p2}) { }
 
     Point operator[](int const idx) const { return _p[idx]; }
-
-    // Draw triangle.
-    void draw(FILE *out_file, int const start_idx, int const resid);
 
     std::array<Point, 3> _p;
 };
@@ -39,17 +36,14 @@ public:
         float const y1, float const z1, float const x2, float const y2,
         float const z2, float const x3, float const y3, float const z3) :
         _p({Point(x0, y0, z0), Point(x1, y1, z1), Point(x2, y2, z2),
-            Point(x3, y3, z3)}) {}
+            Point(x3, y3, z3)}) { }
 
     // From GrANA::Point
     Tetrahedron(
         Point const &p0, Point const &p1, Point const &p2, Point const &p3) :
-        _p({p0, p1, p2, p3}) {}
+        _p({p0, p1, p2, p3}) { }
 
     Point operator[](int const idx) const { return _p[idx]; }
-
-    // Draw tetrahedron.
-    void draw(FILE *out_file, int const start_idx, int const resid);
 
     std::array<Point, 4> _p;
 };
@@ -75,9 +69,6 @@ public:
     // From GrANA::Point.
     Cube(Point const p0, float const dim);
 
-    // Draw cube.
-    void draw(FILE *out_file, int const start_idx, int const resid);
-
     std::array<Point, 8> _p;
     float _dim;
 };
@@ -91,10 +82,11 @@ public:
     Prism(Point const &p0, Point const &p1, Point const &p2, Point const &p3,
         Point const &p4, Point const &p5, Point const &p6, Point const &p7);
 
-    Point &operator[](int const idx) { return _p[idx]; }
+    // Using minimum and maximum coordinates.
+    Prism(float const x_min, float const y_min, float const z_min,
+        float const x_max, float const y_max, float const z_max);
 
-    // Draw prism.
-    void draw(FILE *out_file, int const start_idx, int const resid);
+    Point &operator[](int const idx) { return _p[idx]; }
 
     std::array<Point, 8> _p;
 };

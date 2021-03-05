@@ -1,39 +1,6 @@
 #include "GrANA/continuous_base.hpp"
 
 namespace GrANA {
-// Draw triangle.
-void Triangle::draw(FILE *out_file, int const start_idx, int const resid) {
-    const auto i = start_idx;
-    const auto j = start_idx + 1;
-    const auto k = start_idx + 2;
-
-    _p[0].draw(out_file, i, resid);
-    _p[1].draw(out_file, j, resid);
-    _p[2].draw(out_file, k, resid);
-
-    fmt::print(out_file, "CONECT {:>4} {:>4} {:>4}\n", i, j, k);
-    fmt::print(out_file, "CONECT {:>4} {:>4} {:>4}\n", j, k, i);
-    return;
-}
-
-// Draw tetrahedron.
-void Tetrahedron::draw(FILE *out_file, int const start_idx, int const resid) {
-    const auto i = start_idx;
-    const auto j = start_idx + 1;
-    const auto k = start_idx + 2;
-    const auto l = start_idx + 3;
-
-    _p[0].draw(out_file, i, resid);
-    _p[1].draw(out_file, j, resid);
-    _p[2].draw(out_file, k, resid);
-    _p[3].draw(out_file, l, resid);
-
-    fmt::print(out_file, "CONECT {:>4} {:>4} {:>4}\n", i, j, k, l);
-    fmt::print(out_file, "CONECT {:>4} {:>4} {:>4}\n", j, k, l, i);
-    fmt::print(out_file, "CONECT {:>4} {:>4} {:>4}\n", k, l, i, j);
-    fmt::print(out_file, "CONECT {:>4} {:>4} {:>4}\n", l, i, j, k);
-    return;
-}
 
 Cube::Cube(float const p0x, float const p0y, float const p0z, float const dim) {
     _dim = dim;
@@ -64,34 +31,6 @@ Cube::Cube(Point const p0, float const dim) {
     return;
 }
 
-// Draw cube.
-void Cube::draw(FILE *out_file, int const start_idx, int const resid) {
-    const auto i = start_idx;
-    const auto j = start_idx + 1;
-    const auto k = start_idx + 2;
-    const auto l = start_idx + 3;
-    const auto ii = start_idx + 4;
-    const auto jj = start_idx + 5;
-    const auto kk = start_idx + 6;
-    const auto ll = start_idx + 7;
-
-    _p[0].draw(out_file, i, resid);
-    _p[1].draw(out_file, j, resid);
-    _p[2].draw(out_file, k, resid);
-    _p[3].draw(out_file, l, resid);
-    _p[4].draw(out_file, ii, resid);
-    _p[5].draw(out_file, jj, resid);
-    _p[6].draw(out_file, kk, resid);
-    _p[7].draw(out_file, ll, resid);
-
-    fmt::print(out_file, "CONECT {:>4} {:>4} {:>4} {:>4}\n", i, j, l, ii);
-    fmt::print(out_file, "CONECT {:>4} {:>4} {:>4} {:>4}\n", k, j, l, kk);
-    fmt::print(out_file, "CONECT {:>4} {:>4} {:>4} {:>4}\n", jj, ii, kk, j);
-    fmt::print(out_file, "CONECT {:>4} {:>4} {:>4} {:>4}\n", ll, ii, kk, l);
-
-    return;
-}
-
 // From GrANA::Point
 Prism::Prism(Point const &p0, Point const &p1, Point const &p2, Point const &p3,
     Point const &p4, Point const &p5, Point const &p6, Point const &p7) {
@@ -107,32 +46,20 @@ Prism::Prism(Point const &p0, Point const &p1, Point const &p2, Point const &p3,
     return;
 }
 
-// Draw prism. Can't draw connectivity properly if the prism wasn't constructed
-// with proper Point ordering. SO this class is kind of useless.
-void Prism::draw(FILE *out_file, int const start_idx, int const resid) {
-    const auto i = start_idx;
-    const auto j = start_idx + 1;
-    const auto k = start_idx + 2;
-    const auto l = start_idx + 3;
-    const auto ii = start_idx + 4;
-    const auto jj = start_idx + 5;
-    const auto kk = start_idx + 6;
-    const auto ll = start_idx + 7;
+// Using minimum and maximum coordinates.
+Prism::Prism(float const x_min, float const y_min, float const z_min,
+    float const x_max, float const y_max, float const z_max) {
 
-    _p[0].draw(out_file, i, resid);
-    _p[1].draw(out_file, j, resid);
-    _p[2].draw(out_file, k, resid);
-    _p[3].draw(out_file, l, resid);
-    _p[4].draw(out_file, ii, resid);
-    _p[5].draw(out_file, jj, resid);
-    _p[6].draw(out_file, kk, resid);
-    _p[7].draw(out_file, ll, resid);
-
-    fmt::print(out_file, "CONECT {:>4} {:>4} {:>4} {:>4}\n", i, j, l, ii);
-    fmt::print(out_file, "CONECT {:>4} {:>4} {:>4} {:>4}\n", k, j, l, kk);
-    fmt::print(out_file, "CONECT {:>4} {:>4} {:>4} {:>4}\n", jj, ii, kk, j);
-    fmt::print(out_file, "CONECT {:>4} {:>4} {:>4} {:>4}\n", ll, ii, kk, l);
+    _p[0] = Point(x_min, y_min, z_min);
+    _p[1] = Point(x_max, y_min, z_min);
+    _p[2] = Point(x_min, y_max, z_min);
+    _p[3] = Point(x_max, y_max, z_min);
+    _p[4] = Point(x_min, y_min, z_max);
+    _p[5] = Point(x_max, y_min, z_max);
+    _p[6] = Point(x_min, y_max, z_max);
+    _p[7] = Point(x_max, y_max, z_max);
 
     return;
 }
+
 }
