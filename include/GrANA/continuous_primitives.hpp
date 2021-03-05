@@ -14,12 +14,12 @@ public:
     Vector() = default;
 
     Vector(float const x, float const y, float const z) noexcept :
-        _vxyz{x, y, z}, _origin{0., 0., 0.} {}
+        _vxyz {x, y, z}, _origin {0., 0., 0.} { }
 
     Vector(float const x, float const y, float const z, float const ox,
         float const oy, float const oz) noexcept :
-        _vxyz{x, y, z},
-        _origin{ox, oy, oz} {}
+        _vxyz {x, y, z},
+        _origin {ox, oy, oz} { }
 
     float operator[](int const idx) const { return _vxyz[idx]; }
     float &operator[](int const idx) { return _vxyz[idx]; }
@@ -32,7 +32,6 @@ public:
     void set_oy(float oy) { _origin[1] = oy; }
     void set_oz(float oz) { _origin[2] = oz; }
 
-private:
     std::array<float, 3> _vxyz, _origin;
 };
 
@@ -54,9 +53,9 @@ inline Vector operator-(Vector const &lhs, Vector const &rhs) {
 }
 
 inline bool operator==(Vector const &lhs, Vector const &rhs) {
-    return (lhs[0] == rhs[0] && lhs[1] == rhs[1] && lhs[2] == rhs[2]
-        && lhs.get_ox() == rhs.get_ox() && lhs.get_oy() == rhs.get_oy()
-        && lhs.get_oz() == rhs.get_oz());
+    return (lhs[0] == rhs[0] && lhs[1] == rhs[1] && lhs[2] == rhs[2] &&
+        lhs.get_ox() == rhs.get_ox() && lhs.get_oy() == rhs.get_oy() &&
+        lhs.get_oz() == rhs.get_oz());
 }
 
 // Get the magnitude of the Vector.
@@ -81,26 +80,17 @@ class Point {
 public:
     Point() = default;
 
-    Point(float const x, float const y, float const z) : _xyz{x, y, z} {}
+    Point(float const x, float const y, float const z) : _xyz {x, y, z} { }
 
     Point(CPoint const p) :
-        _xyz{static_cast<float>(CGAL::to_double(p.x())),
+        _xyz {static_cast<float>(CGAL::to_double(p.x())),
             static_cast<float>(CGAL::to_double(p.y())),
-            static_cast<float>(CGAL::to_double(p.z()))} {}
-
-    // Draw atom.
-    void draw(FILE *out_file, int const idx, int const resid) const {
-        fmt::print(out_file,
-            "{: <6}{: >5} {: <4s} {:3} {:1}{: >4}    "
-            "{:8.3f}{:8.3f}{:8.3f}{:6.2f}{:6.2f}          {: >2s}\n",
-            "HETATM", idx, "H", "GPU", "A", resid, _xyz[0], _xyz[1], _xyz[2],
-            1.0, 0.0, "H");
-        return;
-    }
+            static_cast<float>(CGAL::to_double(p.z()))} { }
 
     float operator[](int const idx) const { return _xyz[idx]; }
 
-private:
+    Point(Vector const v) : _xyz {v._vxyz[0], v._vxyz[1], v._vxyz[2]} { }
+
     std::array<float, 3> _xyz;
 };
 
