@@ -34,6 +34,7 @@ Cube::Cube(Point const p0, float const dim) {
 // From GrANA::Point
 Prism::Prism(Point const &p0, Point const &p1, Point const &p2, Point const &p3,
     Point const &p4, Point const &p5, Point const &p6, Point const &p7) {
+
     _p[0] = p0;
     _p[1] = p1;
     _p[2] = p2;
