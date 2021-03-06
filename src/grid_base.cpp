@@ -1,40 +1,36 @@
-#include "GrANA/grid_primitives.hpp"
+#include "GrANA/grid_base.hpp"
 namespace GrANA {
 
-void draw(std::string const &out_fil,
-    std::vector<std::vector<std::vector<grid_t>>> const &mtx,
-    Vector const &orig_vtor, float const resolution) {
-    grid_t const sz_z = mtx.size();
-    grid_t const sz_y = mtx[0].size();
-    grid_t const sz_x = mtx[0][0].size();
+// // From GrANA::GridPoint
+// GridPrism::GridPrism(GridPoint const &p0, GridPoint const &p1,
+//     GridPoint const &p2, GridPoint const &p3, GridPoint const &p4,
+//     GridPoint const &p5, GridPoint const &p6, GridPoint const &p7) {
+//     _p[0] = p0;
+//     _p[1] = p1;
+//     _p[2] = p2;
+//     _p[3] = p3;
+//     _p[4] = p4;
+//     _p[5] = p5;
+//     _p[6] = p6;
+//     _p[7] = p7;
 
-    grid_t idx = 0;
-    FILE *file = std::fopen(out_fil.c_str(), "w");
-    if (file) {
-        for (grid_t k = 0; k < sz_z; ++k) {
-            float const fz = grid_to_cont(k, resolution) + orig_vtor[2];
-            for (grid_t j = 0; j < sz_y; ++j) {
-                float const fy = grid_to_cont(j, resolution) + orig_vtor[1];
-                for (grid_t i = 0; i < sz_x; ++i) {
-                    if (mtx[k][j][i] != 1) {
+//     return;
+// }
 
-                        ++idx;
-                        float const fx =
-                            grid_to_cont(i, resolution) + orig_vtor[0];
-                        fmt::print(file,
-                            "{: <6}{: >6} {: <4s} {:3} {:1}{: >3}    "
-                            "{:8.3f}{:8.3f}{:8.3f}{:6.2f}{:6.2f}          {: "
-                            ">2s}\n",
-                            "ATOM  ", idx, "H", "GPU", "A", 0, fx, fy, fz, 0.0,
-                            0.0, "H");
-                    }
-                }
-            }
-        }
-    } else {
-        std::cerr << "Could not open " << out_fil << ". " << '\n';
-    }
-    std::fclose(file);
-    return;
-}
+// // Using minimum and maximum coordinates.
+// GridPrism::GridPrism(float const x_min, float const y_min, float const z_min,
+//     float const x_max, float const y_max, float const z_max) {
+
+//     _p[0] = GridPoint(x_min, y_min, z_min);
+//     _p[1] = GridPoint(x_max, y_min, z_min);
+//     _p[2] = GridPoint(x_min, y_max, z_min);
+//     _p[3] = GridPoint(x_max, y_max, z_min);
+//     _p[4] = GridPoint(x_min, y_min, z_max);
+//     _p[5] = GridPoint(x_max, y_min, z_max);
+//     _p[6] = GridPoint(x_min, y_max, z_max);
+//     _p[7] = GridPoint(x_max, y_max, z_max);
+
+//     return;
+// }
+
 }
