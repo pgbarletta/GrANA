@@ -1,6 +1,7 @@
 #ifndef GrANA_GRID
 #define GrANA_GRID
 
+#include "GrANA/continuous.hpp"
 #include "GrANA/grid_base.hpp"
 #include "utils.hpp"
 #include <algorithm>
@@ -10,10 +11,44 @@
 
 namespace GrANA {
 
+class BoundingBox {
+public:
+    BoundingBox() = default;
+
+    // BoundingBox(float const xmin, float const ymin, float const zmin,
+    //     float const xmax, float const ymax, float const zmax) noexcept :
+    //     _xmin(xmin),
+    //     _ymin(ymin), _zmin(zmin), _xmax(xmax), _ymax(ymax), _zmax(zmax) {};
+
+    // Box Points and GridPoints
+    std::array<Point, 8> _p;
+    std::array<GridPoint, 8> _gp;
+
+    // Box center coordinates.
+    std::array<grid_t, 3> _center;
+
+    // _size holds the box's size and is equal to the max element of _sizes,
+    // which holds the sizes in xyz coordinates.
+    grid_t _size;
+    std::array<grid_t, 3> _sizes;
+};
+
+// Mainly used by GridMolecule to fill its bounding box.
+void fill_bounding_box(BoundingBox &bbox, float const xmin, float const ymin,
+    float const zmin, float const xmax, float const ymax, float const zmax,
+    Point const &origin, float const resolution);
+
 class GridMolecule {
 public:
     GridMolecule() = default;
-    GridMolecule(Molecule const &in_mol, float const resolution);
+    GridMolecule(Molecule const &in_mol, float const resolution,
+        float const bbox_margin);
+    // Build a GridMolecule using a given origin.
+    GridMolecule(Molecule const &in_mol, float const resolution,
+        float const bbox_margin, Point const &origin);
+
+    // Finish building GridMolecule.
+    void construct_GridMolecule(Molecule const &in_mol);
 
     void draw(std::string const &ou_fil);
 
@@ -23,8 +58,14 @@ public:
     // number of atoms.
     int const _natoms;
 
+    // Resolution used to build the GridMolecule.
+    float const _resolution = 1.0;
+
+    // Extra margin for the bounding box.
+    float const _bbox_margin = 1.0;
+
     // Origin coordinates.
-    Vector _orig_vtor{0.0f, 0.0f, 0.0f};
+    Point _origin {0.0f, 0.0f, 0.0f};
 
     // Atoms coordinates. Using SoA.
     std::vector<grid_t> _x, _y, _z;
@@ -32,24 +73,8 @@ public:
     // Atoms VdW radii
     std::vector<float> _radii;
 
-    // Min and max coordinates for each axis. Can be used to get main cube's
-    // vertices coordinates.
-    std::array<grid_t, 3> _start{std::numeric_limits<grid_t>::max(),
-        std::numeric_limits<grid_t>::max(), std::numeric_limits<grid_t>::max()},
-        _end{std::numeric_limits<grid_t>::min(),
-            std::numeric_limits<grid_t>::min(),
-            std::numeric_limits<grid_t>::min()};
-
-    // Cube's center coordinates.
-    std::array<grid_t, 3> _center;
-
-    // _size holds the cube's size and is equal to the max element of _sizes,
-    // which holds the sizes in xyz coordinates.
-    grid_t _size;
-    std::array<grid_t, 3> _sizes;
-
-    // Resolution used to build the GridMolecule.
-    float const _resolution = 1.0;
+    // Bouding box
+    BoundingBox _bbox;
 };
 
 class GridConvexHull {
