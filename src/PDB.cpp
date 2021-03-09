@@ -64,7 +64,7 @@ auto read_PDB(std::string const &in_filename)
 }
 
 // Write GridPoint as atom to PDB file.
-void draw_PDB(GridPoint const &gpoint, FILE *ou_fil, int idx, int resid,
+void draw(GridPoint const &gpoint, FILE *ou_fil, int idx, int resid,
     Point const &origin, float const resolution) {
     float const fx = grid_to_cont(gpoint._xyz[0], resolution) + origin[0];
     float const fy = grid_to_cont(gpoint._xyz[1], resolution) + origin[1];
@@ -85,7 +85,7 @@ void draw_PDB(GridMolecule const &gmolecula, std::string const &ou_fil) {
             GridPoint const atm(
                 gmolecula._x[i], gmolecula._y[i], gmolecula._z[i]);
 
-            draw_PDB(atm, file, i + 1, i + 1, gmolecula._origin,
+            draw(atm, file, i + 1, i + 1, gmolecula._origin,
                 gmolecula._resolution);
         }
     } else {
@@ -97,8 +97,7 @@ void draw_PDB(GridMolecule const &gmolecula, std::string const &ou_fil) {
 }
 
 // Write Point as atom to PDB file.
-void draw_PDB(
-    Point const &point, FILE *out_file, int const idx, int const resid) {
+void draw(Point const &point, FILE *out_file, int const idx, int const resid) {
     fmt::print(out_file,
         "{: <6}{: >5} {: <4s} {:3} {:1}{: >4}    "
         "{:8.3f}{:8.3f}{:8.3f}{:6.2f}{:6.2f}          {: >2s}\n",
@@ -108,15 +107,15 @@ void draw_PDB(
 }
 
 // Write triangle.
-void draw_PDB(Triangle const &triangulo, FILE *out_file, int const start_idx,
+void draw(Triangle const &triangulo, FILE *out_file, int const start_idx,
     int const resid) {
     const auto i = start_idx;
     const auto j = start_idx + 1;
     const auto k = start_idx + 2;
 
-    draw_PDB(triangulo._p[0], out_file, i, resid);
-    draw_PDB(triangulo._p[1], out_file, j, resid);
-    draw_PDB(triangulo._p[2], out_file, k, resid);
+    draw(triangulo._p[0], out_file, i, resid);
+    draw(triangulo._p[1], out_file, j, resid);
+    draw(triangulo._p[2], out_file, k, resid);
 
     fmt::print(out_file, "CONECT {:>4} {:>4} {:>4}\n", i, j, k);
     fmt::print(out_file, "CONECT {:>4} {:>4} {:>4}\n", j, k, i);
@@ -124,17 +123,17 @@ void draw_PDB(Triangle const &triangulo, FILE *out_file, int const start_idx,
 }
 
 // Write tetrahedron.
-void draw_PDB(Tetrahedron const &tetrahedro, FILE *out_file,
-    int const start_idx, int const resid) {
+void draw(Tetrahedron const &tetrahedro, FILE *out_file, int const start_idx,
+    int const resid) {
     const auto i = start_idx;
     const auto j = start_idx + 1;
     const auto k = start_idx + 2;
     const auto l = start_idx + 3;
 
-    draw_PDB(tetrahedro._p[0], out_file, i, resid);
-    draw_PDB(tetrahedro._p[1], out_file, j, resid);
-    draw_PDB(tetrahedro._p[2], out_file, k, resid);
-    draw_PDB(tetrahedro._p[3], out_file, l, resid);
+    draw(tetrahedro._p[0], out_file, i, resid);
+    draw(tetrahedro._p[1], out_file, j, resid);
+    draw(tetrahedro._p[2], out_file, k, resid);
+    draw(tetrahedro._p[3], out_file, l, resid);
 
     fmt::print(out_file, "CONECT {:>4} {:>4} {:>4}\n", i, j, k, l);
     fmt::print(out_file, "CONECT {:>4} {:>4} {:>4}\n", j, k, l, i);
@@ -155,14 +154,14 @@ void draw_PDB(
     const auto kk = start_idx + 6;
     const auto ll = start_idx + 7;
 
-    draw_PDB(cubo._p[0], out_file, i, resid);
-    draw_PDB(cubo._p[1], out_file, j, resid);
-    draw_PDB(cubo._p[2], out_file, k, resid);
-    draw_PDB(cubo._p[3], out_file, l, resid);
-    draw_PDB(cubo._p[4], out_file, ii, resid);
-    draw_PDB(cubo._p[5], out_file, jj, resid);
-    draw_PDB(cubo._p[6], out_file, kk, resid);
-    draw_PDB(cubo._p[7], out_file, ll, resid);
+    draw(cubo._p[0], out_file, i, resid);
+    draw(cubo._p[1], out_file, j, resid);
+    draw(cubo._p[2], out_file, k, resid);
+    draw(cubo._p[3], out_file, l, resid);
+    draw(cubo._p[4], out_file, ii, resid);
+    draw(cubo._p[5], out_file, jj, resid);
+    draw(cubo._p[6], out_file, kk, resid);
+    draw(cubo._p[7], out_file, ll, resid);
 
     fmt::print(out_file, "CONECT {:>4} {:>4} {:>4} {:>4}\n", i, j, l, ii);
     fmt::print(out_file, "CONECT {:>4} {:>4} {:>4} {:>4}\n", k, j, l, kk);
@@ -172,10 +171,10 @@ void draw_PDB(
     return;
 }
 
-// Write prism to an existing. Can't draw connectivity properly if the prism
-// wasn't constructed with proper Point ordering. So this class is kind of
+// Write prism to an existing PDB file. Can't draw connectivity properly if the
+// prism wasn't constructed with proper Point ordering. So this class is kind of
 // useless.
-void draw_PDB(
+void draw(
     Prism const &prisma, FILE *out_file, int const start_idx, int const resid) {
     const auto i = start_idx;
     const auto j = start_idx + 1;
@@ -186,14 +185,14 @@ void draw_PDB(
     const auto kk = start_idx + 6;
     const auto ll = start_idx + 7;
 
-    draw_PDB(prisma._p[0], out_file, i, resid);
-    draw_PDB(prisma._p[1], out_file, j, resid);
-    draw_PDB(prisma._p[2], out_file, k, resid);
-    draw_PDB(prisma._p[3], out_file, l, resid);
-    draw_PDB(prisma._p[4], out_file, ii, resid);
-    draw_PDB(prisma._p[5], out_file, jj, resid);
-    draw_PDB(prisma._p[6], out_file, kk, resid);
-    draw_PDB(prisma._p[7], out_file, ll, resid);
+    draw(prisma._p[0], out_file, i, resid);
+    draw(prisma._p[1], out_file, j, resid);
+    draw(prisma._p[2], out_file, k, resid);
+    draw(prisma._p[3], out_file, l, resid);
+    draw(prisma._p[4], out_file, ii, resid);
+    draw(prisma._p[5], out_file, jj, resid);
+    draw(prisma._p[6], out_file, kk, resid);
+    draw(prisma._p[7], out_file, ll, resid);
 
     fmt::print(out_file, "CONECT {:>4} {:>4} {:>4} {:>4}\n", i, j, k, ii);
     fmt::print(out_file, "CONECT {:>4} {:>4} {:>4}\n", j, l, jj);
@@ -215,13 +214,55 @@ void draw_PDB(Prism const &prisma, std::string const &out_file) {
         int resid = 1;
         for (int i = 0; i < n_prismas; ++i) {
             const auto start_idx = i * 8 + 1;
-            draw_PDB(prisma, file, start_idx, resid++);
+            draw(prisma, file, start_idx, resid++);
         }
     } else {
         std::cerr << "Could not open " << out_file << ". " << '\n';
     }
     std::fclose(file);
 
+    return;
+}
+
+// Write BoundingBox to a new PDB file.
+void draw_PDB(BoundingBox const &bbox, std::string const &out_file) {
+
+    FILE *file = std::fopen(out_file.c_str(), "w");
+    if (file) {
+        for (int i = 0; i < 8; ++i) {
+            draw(bbox._p[i], file, i + 1, 1);
+        }
+    } else {
+        std::cerr << "Could not open " << out_file << ". " << '\n';
+    }
+
+    // draw(bbox._p[0], out_file, i, resid);
+    // draw(bbox._p[1], out_file, j, resid);
+    // draw(bbox._p[2], out_file, k, resid);
+    // draw(bbox._p[3], out_file, l, resid);
+    // draw(bbox._p[4], out_file, ii, resid);
+    // draw(bbox._p[5], out_file, jj, resid);
+    // draw(bbox._p[6], out_file, kk, resid);
+    // draw(bbox._p[7], out_file, ll, resid);
+
+    int const i = 1;
+    int const j = i + 1;
+    int const k = i + 2;
+    int const l = i + 3;
+    int const ii = i + 4;
+    int const jj = i + 5;
+    int const kk = i + 6;
+    int const ll = i + 7;
+
+    fmt::print(file, "CONECT {:>4} {:>4} {:>4} {:>4}\n", i, j, k, ii);
+    fmt::print(file, "CONECT {:>4} {:>4} {:>4}\n", j, l, jj);
+    fmt::print(file, "CONECT {:>4} {:>4} {:>4}\n", k, l, kk);
+    fmt::print(file, "CONECT {:>4} {:>4}\n", l, ll);
+
+    fmt::print(file, "CONECT {:>4} {:>4} {:>4}\n", ii, jj, kk);
+    fmt::print(file, "CONECT {:>4} {:>4} {:>4}\n", ll, jj, kk);
+
+    std::fclose(file);
     return;
 }
 
@@ -233,7 +274,7 @@ void draw_PDB(ConvexHull const &ch, std::string const &out_file) {
         int resid = 1;
         for (int i = 0; i < ch._ntriangles; ++i) {
             const auto start_idx = i * 3 + 1;
-            draw_PDB(ch._triangles[i], file, start_idx, resid++);
+            draw(ch._triangles[i], file, start_idx, resid++);
         }
         for (int i = 0; i < ch._ntriangles; ++i) {
             const auto j = i * 3 + 1;
@@ -256,7 +297,7 @@ void draw_PDB(Triangulation const &triangulacion, std::string const &out_file) {
         int resid = 1;
         for (int i = 0; i < triangulacion._ntetrahedrons; ++i) {
             const auto start_idx = i * 4 + 1;
-            draw_PDB(triangulacion._tetrahedrons[i], file, start_idx, resid++);
+            draw(triangulacion._tetrahedrons[i], file, start_idx, resid++);
         }
         for (int i = 0; i < triangulacion._ntetrahedrons; ++i) {
             const auto j = i * 4 + 1;
@@ -284,7 +325,7 @@ void draw_PDB(Molecule const &molecula, std::string const &out_file) {
     if (file) {
         for (int i = 0; i <= molecula._natoms - 1; ++i) {
             Point const atm(molecula._x[i], molecula._y[i], molecula._z[i]);
-            draw_PDB(atm, file, i + 1, i + 1);
+            draw(atm, file, i + 1, i + 1);
         }
     } else {
         std::cerr << "Could not open " << out_file << ". " << '\n';

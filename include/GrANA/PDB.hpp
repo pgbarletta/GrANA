@@ -20,7 +20,7 @@ namespace GrANA {
 auto read_PDB(std::string const &in_filename) -> std::tuple<Molecule, Molecule>;
 
 // Write GridPoint as atom to PDB file.
-void draw_PDB(GridPoint const &gpoint, FILE *ou_fil, int idx, int resid,
+void draw(GridPoint const &gpoint, FILE *ou_fil, int idx, int resid,
     Point const &origin, float const resolution);
 
 // Write GridMolecule to PDB file.
@@ -41,19 +41,23 @@ void draw_PDB(Tetrahedron const &tetrahedro, FILE *out_file,
 void draw_PDB(
     Cube const &cubo, FILE *out_file, int const start_idx, int const resid);
 
-// Write prism. Can't draw connectivity properly if the prism wasn't constructed
-// with proper Point ordering. So this class is kind of useless.
-void draw_PDB(
+// Write prism to an existing PDB file. Can't draw connectivity properly if the
+// prism wasn't constructed with proper Point ordering. So this class is kind of
+// useless.
+void draw(
     Prism const &prisma, FILE *out_file, int const start_idx, int const resid);
 
 // Write prism to a new PDB file.
 void draw_PDB(Prism const &prisma, std::string const &out_file);
 
-// Write Triangulation to PDB file.
-void draw_PDB(Triangulation const &triangulacion, std::string const &out_file);
+// Write BoundingBox to a new PDB file.
+void draw_PDB(BoundingBox const &bbox, std::string const &out_file);
 
 // Write ConvexHull to PDB file.
 void draw_PDB(ConvexHull const &ch, std::string const &out_file);
+
+// Write Triangulation to PDB file.
+void draw_PDB(Triangulation const &triangulacion, std::string const &out_file);
 
 // Write Molecule to PDB file.
 void draw_PDB(Molecule const &molecula, std::string const &out_file);
