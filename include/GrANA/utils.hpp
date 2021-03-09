@@ -13,7 +13,7 @@ namespace GrANA {
 
 // Read input.
 auto get_input(int argc, char **argv)
-    -> std::tuple<std::string, std::string, float>;
+    -> std::tuple<std::string, float, float, std::string>;
 
 // Helper function for getting the indices that sort a vector.
 template <typename T>
