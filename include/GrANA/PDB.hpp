@@ -26,6 +26,14 @@ void draw(GridPoint const &gpoint, FILE *ou_fil, int idx, int resid,
 // Write GridMolecule to PDB file.
 void draw_PDB(GridMolecule const &gmolecula, std::string const &ou_fil);
 
+// Write selected GridPoints from GridMolecule to PDB file.
+void draw_selection_PDB(GridMolecule const &gmolecula,
+    std::string const &ou_fil, std::vector<uint32_t> const &selection);
+
+// Write range of GridPoints from GridMolecule to PDB file.
+void draw_range_PDB(GridMolecule const &gmolecula, std::string const &ou_fil,
+    std::tuple<uint32_t, uint32_t> const range);
+
 // Write Point as atom to PDB file.
 void draw(Point const &point, FILE *out_file, int const idx, int const resid);
 

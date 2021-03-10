@@ -81,7 +81,7 @@ void draw_PDB(GridMolecule const &gmolecula, std::string const &ou_fil) {
 
     FILE *file = std::fopen(ou_fil.c_str(), "w");
     if (file) {
-        for (int i = 0; i <= gmolecula._natoms - 1; ++i) {
+        for (int i = 0; i < gmolecula._natoms; ++i) {
             GridPoint const atm(
                 gmolecula._x[i], gmolecula._y[i], gmolecula._z[i]);
 
@@ -92,6 +92,50 @@ void draw_PDB(GridMolecule const &gmolecula, std::string const &ou_fil) {
         std::cerr << "Could not open " << ou_fil << ". " << '\n';
     }
 
+    fmt::print(file, "END\n");
+    std::fclose(file);
+    return;
+}
+// Write selected GridPoints from GridMolecule to PDB file.
+void draw_selection_PDB(GridMolecule const &gmolecula,
+    std::string const &ou_fil, std::vector<uint32_t> const &selection) {
+
+    FILE *file = std::fopen(ou_fil.c_str(), "w");
+    if (file) {
+        for (uint32_t const i : selection) {
+            GridPoint const atm(
+                gmolecula._x[i], gmolecula._y[i], gmolecula._z[i]);
+
+            draw(atm, file, i + 1, i + 1, gmolecula._origin,
+                gmolecula._resolution);
+        }
+    } else {
+        std::cerr << "Could not open " << ou_fil << ". " << '\n';
+    }
+
+    fmt::print(file, "END\n");
+    std::fclose(file);
+    return;
+}
+
+// Write range of GridPoints from GridMolecule to PDB file.
+void draw_range_PDB(GridMolecule const &gmolecula, std::string const &ou_fil,
+    std::tuple<uint32_t, uint32_t> const range) {
+
+    FILE *file = std::fopen(ou_fil.c_str(), "w");
+    if (file) {
+        for (uint32_t i = std::get<0>(range); i < std::get<1>(range); ++i) {
+            GridPoint const atm(
+                gmolecula._x[i], gmolecula._y[i], gmolecula._z[i]);
+
+            draw(atm, file, i + 1, i + 1, gmolecula._origin,
+                gmolecula._resolution);
+        }
+    } else {
+        std::cerr << "Could not open " << ou_fil << ". " << '\n';
+    }
+
+    fmt::print(file, "END\n");
     std::fclose(file);
     return;
 }
@@ -219,8 +263,9 @@ void draw_PDB(Prism const &prisma, std::string const &out_file) {
     } else {
         std::cerr << "Could not open " << out_file << ". " << '\n';
     }
-    std::fclose(file);
 
+    fmt::print(file, "END\n");
+    std::fclose(file);
     return;
 }
 
@@ -235,15 +280,6 @@ void draw_PDB(BoundingBox const &bbox, std::string const &out_file) {
     } else {
         std::cerr << "Could not open " << out_file << ". " << '\n';
     }
-
-    // draw(bbox._p[0], out_file, i, resid);
-    // draw(bbox._p[1], out_file, j, resid);
-    // draw(bbox._p[2], out_file, k, resid);
-    // draw(bbox._p[3], out_file, l, resid);
-    // draw(bbox._p[4], out_file, ii, resid);
-    // draw(bbox._p[5], out_file, jj, resid);
-    // draw(bbox._p[6], out_file, kk, resid);
-    // draw(bbox._p[7], out_file, ll, resid);
 
     int const i = 1;
     int const j = i + 1;
@@ -262,6 +298,7 @@ void draw_PDB(BoundingBox const &bbox, std::string const &out_file) {
     fmt::print(file, "CONECT {:>4} {:>4} {:>4}\n", ii, jj, kk);
     fmt::print(file, "CONECT {:>4} {:>4} {:>4}\n", ll, jj, kk);
 
+    fmt::print(file, "END\n");
     std::fclose(file);
     return;
 }
@@ -284,6 +321,7 @@ void draw_PDB(ConvexHull const &ch, std::string const &out_file) {
     } else {
         std::cerr << "Could not open " << out_file << ". " << '\n';
     }
+    fmt::print(file, "END\n");
     std::fclose(file);
 
     return;
@@ -313,6 +351,7 @@ void draw_PDB(Triangulation const &triangulacion, std::string const &out_file) {
     } else {
         std::cerr << "Could not open " << out_file << ". " << '\n';
     }
+    fmt::print(file, "END\n");
     std::fclose(file);
 
     return;
@@ -330,7 +369,9 @@ void draw_PDB(Molecule const &molecula, std::string const &out_file) {
     } else {
         std::cerr << "Could not open " << out_file << ". " << '\n';
     }
+    fmt::print(file, "END\n");
     std::fclose(file);
+
     return;
 }
 
@@ -368,7 +409,9 @@ void draw_grid_mtx(std::string const &out_fil,
     } else {
         std::cerr << "Could not open " << out_fil << ". " << '\n';
     }
+    fmt::print(file, "END\n");
     std::fclose(file);
+
     return;
 }
 
