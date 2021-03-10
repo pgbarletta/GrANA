@@ -8,80 +8,83 @@
 
 namespace GrANA {
 
-class Octree {
-public:
-    Octree(Molecule const &in_mol, float const resolution,
-        grid_t const bucket_size);
+// class Octree {
+// public:
+//     Octree(Molecule const &in_mol, float const resolution,
+//         grid_t const bucket_size);
 
-    class Octant {
-    public:
-        Octant() = default;
+//     class Octant {
+//     public:
+//         Octant() = default;
 
-        std::array<grid_t, 3> _start, _end;
-        int _natoms;
-        Octant *_childs[8];
-        bool _leaf = true;
-    };
+//         std::array<grid_t, 3> _start, _end;
+//         int _natoms;
+//         Octant *_childs[8];
+//         bool _leaf = true;
+//     };
 
-    template <typename Iterator>
-    auto newOctant(grid_t const x_min, grid_t const y_min, grid_t const z_min,
-        grid_t const x_max, grid_t const y_max, grid_t const z_max,
-        std::array<grid_t, 3> center, Iterator x_begin, Iterator x_end,
-        Iterator y_begin, Iterator y_end, Iterator z_begin, Iterator z_end,
-        int const natoms) -> Octant * {
+//     template <typename Iterator>
+//     auto newOctant(grid_t const x_min, grid_t const y_min, grid_t const
+//     z_min,
+//         grid_t const x_max, grid_t const y_max, grid_t const z_max,
+//         std::array<grid_t, 3> center, Iterator x_begin, Iterator x_end,
+//         Iterator y_begin, Iterator y_end, Iterator z_begin, Iterator z_end,
+//         int const natoms) -> Octant * {
 
-        Octant *octant = new Octant;
-        octant->_start = {x_min, y_min, z_min};
-        octant->_end = {x_max, y_max, z_max};
-        octant->_natoms = natoms;
+//         Octant *octant = new Octant;
+//         octant->_start = {x_min, y_min, z_min};
+//         octant->_end = {x_max, y_max, z_max};
+//         octant->_natoms = natoms;
 
-        auto const x_medio = std::lower_bound(x_begin, x_end, center[0]);
-        auto const y_medio = std::lower_bound(y_begin, y_end, center[1]);
-        auto const z_medio = std::lower_bound(z_begin, z_end, center[2]);
+//         auto const x_medio = std::lower_bound(x_begin, x_end, center[0]);
+//         auto const y_medio = std::lower_bound(y_begin, y_end, center[1]);
+//         auto const z_medio = std::lower_bound(z_begin, z_end, center[2]);
 
-        return octant;
-    }
+//         return octant;
+//     }
 
-    // Indices that sort the atoms along the 3 axes.
-    std::vector<int> const _idx_x, _idx_y, _idx_z;
+//     // Indices that sort the atoms along the 3 axes.
+//     std::vector<int> const _idx_x, _idx_y, _idx_z;
 
-    // number of atoms.
-    int const _natoms;
+//     // number of atoms.
+//     int const _natoms;
 
-    // Origin coordinates.
-    Vector _origin {0.0f, 0.0f, 0.0f};
+//     // Origin coordinates.
+//     Vector _origin {0.0f, 0.0f, 0.0f};
 
-    // Atoms coordinates. Using SoA.
-    std::vector<grid_t> _x, _y, _z;
+//     // Atoms coordinates. Using SoA.
+//     std::vector<grid_t> _x, _y, _z;
 
-    // Atoms VdW radii
-    std::vector<float> _radii;
+//     // Atoms VdW radii
+//     std::vector<float> _radii;
 
-    // Min and max coordinates for each axis. Can be used to get main cube's
-    // vertices coordinates.
-    std::array<grid_t, 3> _start {std::numeric_limits<grid_t>::max(),
-        std::numeric_limits<grid_t>::max(), std::numeric_limits<grid_t>::max()},
-        _end {std::numeric_limits<grid_t>::min(),
-            std::numeric_limits<grid_t>::min(),
-            std::numeric_limits<grid_t>::min()};
+//     // Min and max coordinates for each axis. Can be used to get main cube's
+//     // vertices coordinates.
+//     std::array<grid_t, 3> _start {std::numeric_limits<grid_t>::max(),
+//         std::numeric_limits<grid_t>::max(),
+//         std::numeric_limits<grid_t>::max()}, _end
+//         {std::numeric_limits<grid_t>::min(),
+//             std::numeric_limits<grid_t>::min(),
+//             std::numeric_limits<grid_t>::min()};
 
-    // Cube's center coordinates.
-    std::array<grid_t, 3> _center;
+//     // Cube's center coordinates.
+//     std::array<grid_t, 3> _center;
 
-    // _size holds the cube's size and is equal to the max element of _sizes,
-    // which holds the sizes in xyz coordinates.
-    grid_t _size;
-    std::array<grid_t, 3> _sizes;
+//     // _size holds the cube's size and is equal to the max element of _sizes,
+//     // which holds the sizes in xyz coordinates.
+//     grid_t _size;
+//     std::array<grid_t, 3> _sizes;
 
-    // Resolution used to build the GridMolecule.
-    float const _resolution = 1.0;
+//     // Resolution used to build the GridMolecule.
+//     float const _resolution = 1.0;
 
-    // Minimum octant size.
-    int const _bucket_size = 5;
+//     // Minimum octant size.
+//     uint32_t const _bucket_size = 5;
 
-    // Main octant
-    Octant *_root;
-};
+//     // Main octant
+//     Octant *_root;
+// };
+
 }
 
 #endif // GrANA_OCTREE_H
