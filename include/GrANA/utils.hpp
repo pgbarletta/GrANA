@@ -15,9 +15,9 @@ namespace GrANA {
 auto get_input(int argc, char **argv)
     -> std::tuple<std::string, float, float, std::string>;
 
-// Helper function for getting the indices that sort a vector.
+// Helper function for getting the `int` indices that sort a vector.
 template <typename T>
-auto sort_indices(std::vector<T> const &v) -> std::vector<int> {
+auto sort_indices_int(std::vector<T> const &v) -> std::vector<int> {
 
     // initialize original index locations
     std::vector<int> idx(v.size());
@@ -26,6 +26,20 @@ auto sort_indices(std::vector<T> const &v) -> std::vector<int> {
     // sort indices based on comparing values in v
     sort(
         idx.begin(), idx.end(), [&v](int i1, int i2) { return v[i1] < v[i2]; });
+    return idx;
+}
+
+// Helper function for getting the `int` indices that sort a vector.
+template <typename T>
+auto sort_indices_uint32(std::vector<T> const &v) -> std::vector<uint32_t> {
+
+    // initialize original index locations
+    std::vector<uint32_t> idx(v.size());
+    std::iota(idx.begin(), idx.end(), 0);
+
+    // sort indices based on comparing values in v
+    sort(idx.begin(), idx.end(),
+        [&v](uint32_t i1, uint32_t i2) { return v[i1] < v[i2]; });
     return idx;
 }
 
@@ -51,6 +65,56 @@ auto reorder(Container_u const &u, Container_v const &v) -> Container_u {
     }
 
     return w;
+}
+
+// Helper function to use binary search to find the lowest bound of a query in
+// an unsorted vector and vector of indices that sorts it in ascending order.
+template <typename T>
+int lb_with_indices(const std::vector<T> &vector, const std::vector<T> &indices,
+    const T query) {
+
+    int count = vector.size(), step, current;
+    int first = 0;
+
+    while (count > 0) {
+        step = count / 2;
+        current = first;
+        current += step;
+
+        if (vector[indices[current]] < query) {
+            first = ++current;
+            count -= (step + 1);
+        } else
+            count = step;
+    }
+
+    // Done
+    return first;
+}
+
+// Helper function to use binary search to find the upper bound of a query in
+// an unsorted vector and vector of indices that sorts it in ascending order.
+template <typename T>
+int ub_with_indices(const std::vector<T> &vector, const std::vector<T> &indices,
+    const T query) {
+
+    int count = vector.size(), step, current;
+    int first = 0;
+
+    while (count > 0) {
+        step = count / 2;
+        current = first;
+        current += step;
+
+        if (vector[indices[current]] > query) {
+            first = ++current;
+            count -= (step + 1);
+        } else
+            count = step;
+    }
+
+    // Done
+    return first;
 }
 
 } // namespace GrANA
