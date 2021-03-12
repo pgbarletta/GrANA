@@ -3,10 +3,10 @@ namespace GrANA {
 
 GridMolecule::GridMolecule(
     Molecule const &in_mol, float const resolution, float const bbox_margin) :
-    _idx_x(sort_indices(in_mol._x)),
-    _idx_y(sort_indices(in_mol._y)), _idx_z(sort_indices(in_mol._z)),
-    _natoms(in_mol._natoms), _resolution(resolution),
-    _bbox_margin(bbox_margin) {
+    _idx_x(sort_indices_uint32(in_mol._x)),
+    _idx_y(sort_indices_uint32(in_mol._y)),
+    _idx_z(sort_indices_uint32(in_mol._z)), _natoms(in_mol._natoms),
+    _resolution(resolution), _bbox_margin(bbox_margin) {
 
     _origin = Point(std::floor(in_mol._x[_idx_x[0]]),
         std::floor(in_mol._y[_idx_y[0]]), std::floor(in_mol._z[_idx_z[0]]));
@@ -19,10 +19,10 @@ GridMolecule::GridMolecule(
 // Build a GridMolecule using a given origin.
 GridMolecule::GridMolecule(Molecule const &in_mol, float const resolution,
     float const bbox_margin, Point const &origin) :
-    _idx_x(sort_indices(in_mol._x)),
-    _idx_y(sort_indices(in_mol._y)), _idx_z(sort_indices(in_mol._z)),
-    _natoms(in_mol._natoms), _resolution(resolution), _bbox_margin(bbox_margin),
-    _origin(origin) {
+    _idx_x(sort_indices_uint32(in_mol._x)),
+    _idx_y(sort_indices_uint32(in_mol._y)),
+    _idx_z(sort_indices_uint32(in_mol._z)), _natoms(in_mol._natoms),
+    _resolution(resolution), _bbox_margin(bbox_margin), _origin(origin) {
 
     construct_GridMolecule(in_mol);
 
@@ -89,6 +89,30 @@ void fill_bounding_box(BoundingBox &bbox, float const xmin, float const ymin,
         (bbox._sizes[0]) / 2, (bbox._sizes[1]) / 2, (bbox._sizes[2]) / 2};
 
     return;
+}
+
+// Doing this in O(N), without any sorting or binary search. We'll see. TODO.
+std::vector<uint32_t> get_atoms_in_bbox(
+    GridMolecule const &gmolecule, BoundingBox const &bbox) {
+
+    std::vector<uint32_t> in_bounding_box;
+    for (uint32_t i = 0; i < gmolecule._x.size(); ++i) {
+        if ((gmolecule._x[i] > bbox._gp[0][0]) &&
+            (gmolecule._x[i] < bbox._gp[7][0])) {
+
+            if ((gmolecule._y[i] > bbox._gp[0][1]) &&
+                (gmolecule._y[i] < bbox._gp[7][1])) {
+
+                if ((gmolecule._z[i] > bbox._gp[0][2]) &&
+                    (gmolecule._z[i] < bbox._gp[7][2])) {
+
+                    in_bounding_box.push_back(i);
+                }
+            }
+        }
+    }
+
+    return in_bounding_box;
 }
 
 // auto fill_grid_tetrahedron(GridMolecule const &in_mol)
