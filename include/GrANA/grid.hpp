@@ -53,7 +53,7 @@ public:
     void draw(std::string const &ou_fil);
 
     // Indices that sort the atoms along the 3 axes.
-    std::vector<int> const _idx_x, _idx_y, _idx_z;
+    std::vector<uint32_t> const _idx_x, _idx_y, _idx_z;
 
     // number of atoms.
     int const _natoms;
@@ -62,7 +62,7 @@ public:
     float const _resolution = 1.0;
 
     // Extra margin for the bounding box.
-    float const _bbox_margin = 1.0;
+    float _bbox_margin = 1.0;
 
     // Origin coordinates.
     Point _origin {0.0f, 0.0f, 0.0f};
@@ -76,6 +76,10 @@ public:
     // Bouding box
     BoundingBox _bbox;
 };
+
+// Doing this in O(N), without any sorting or binary search. We'll see. TODO.
+std::vector<uint32_t> get_atoms_in_bbox(
+    GridMolecule const &molecule, BoundingBox const &bbox);
 
 class GridConvexHull {
 public:
