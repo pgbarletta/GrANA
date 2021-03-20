@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.10.0)
 project(grana VERSION 0.1.0 LANGUAGES CXX)
+set(CMAKE_BUILD_TYPE Debug)
 
 ###################################################################
 if(NOT WIN32)
@@ -53,6 +54,9 @@ include_directories(build/external/chemfiles/external/fmt/include)
 
 # find_package(fmt)
 # target_link_libraries(<your-target> fmt::fmt)
+
+# find_package(Open3D HINTS ${CMAKE_INSTALL_PREFIX}/lib/cmake)
+# target_link_libraries(grana Open3D::Open3D)
 
 target_include_directories(grana
     PRIVATE
