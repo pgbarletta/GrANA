@@ -15,10 +15,14 @@ class BoundingBox {
 public:
     BoundingBox() = default;
 
-    // BoundingBox(float const xmin, float const ymin, float const zmin,
-    //     float const xmax, float const ymax, float const zmax) noexcept :
-    //     _xmin(xmin),
-    //     _ymin(ymin), _zmin(zmin), _xmax(xmax), _ymax(ymax), _zmax(zmax) {};
+    // Resolution used to build the BoundingBox.
+    float _resolution = 1.0;
+
+    // Origin coordinates.
+    Point _origin {0.0f, 0.0f, 0.0f};
+
+    // Extra margin for the BoundingBox.
+    unsigned int _bbox_margin = 1;
 
     // Box Points and GridPoints
     std::array<Point, 8> _p;
@@ -27,25 +31,23 @@ public:
     // Box center coordinates.
     std::array<grid_t, 3> _center;
 
-    // _size holds the box's size and is equal to the max element of _sizes,
-    // which holds the sizes in xyz coordinates.
-    grid_t _size;
-    std::array<grid_t, 3> _sizes;
+    // Box dimensions.
+    grid_t _dimx, _dimy, _dimz;
 };
 
 // Mainly used by GridMolecule to fill its bounding box.
-void fill_bounding_box(BoundingBox &bbox, float const xmin, float const ymin,
-    float const zmin, float const xmax, float const ymax, float const zmax,
-    Point const &origin, float const resolution);
+void fill_bounding_box(BoundingBox &bbox, grid_t const xmin, grid_t const ymin,
+    grid_t const zmin, grid_t const xmax, grid_t const ymax, grid_t const zmax,
+    float const resolution, Point const &origin, unsigned int const margin);
 
 class GridMolecule {
 public:
     GridMolecule() = default;
     GridMolecule(Molecule const &in_mol, float const resolution,
-        float const bbox_margin);
+        unsigned int const bbox_margin);
     // Build a GridMolecule using a given origin.
     GridMolecule(Molecule const &in_mol, float const resolution,
-        float const bbox_margin, Point const &origin);
+        unsigned int const bbox_margin, Point const &origin);
 
     // Finish building GridMolecule.
     void construct_GridMolecule(Molecule const &in_mol);
@@ -59,10 +61,10 @@ public:
     int const _natoms;
 
     // Resolution used to build the GridMolecule.
-    float const _resolution = 1.0;
+    float _resolution = 1.0;
 
     // Extra margin for the bounding box.
-    float _bbox_margin = 1.0;
+    unsigned int _bbox_margin = 1;
 
     // Origin coordinates.
     Point _origin {0.0f, 0.0f, 0.0f};
@@ -91,10 +93,31 @@ public:
     std::vector<float> _dots;
 };
 
-class GridBool {
+class GridMatrix {
 public:
-    GridBool() = default;
-    GridBool(ConvexHull const &CH);
+    GridMatrix() = default;
+
+    // Delegated constructor
+    GridMatrix(grid_t const x, grid_t const y, grid_t const z,
+        float const resolution, Point const origin);
+
+    // Delegating constructor
+    GridMatrix(GridMolecule const &gmolecule);
+
+    // GridMatrix dimensions.
+    grid_t _dimx, _dimy, _dimz;
+
+    // Number of grid particles.
+    grid_t _n;
+
+    // Flattened 3D array that indicates if a grid particle is filled or not.
+    std::vector<bool> _bool;
+
+    // Resolution used to build the GridMolecule.
+    float _resolution = 1.0;
+
+    // Origin coordinates.
+    Point _origin {0.0f, 0.0f, 0.0f};
 };
 
 auto fill_grid_tetrahedron(GridMolecule const &in_mol)
