@@ -27,15 +27,15 @@ class GridPoint {
 public:
     GridPoint() = default;
 
-    GridPoint(const grid_t x, const grid_t y, const grid_t z) noexcept :
+    GridPoint(grid_t const x, grid_t const y, grid_t const z) noexcept :
         _xyz {x, y, z} { }
 
-    GridPoint(const Point &p, float const resolution) noexcept :
+    GridPoint(Point const &p, float const resolution) noexcept :
         _xyz {cont_to_grid(p[0], resolution), cont_to_grid(p[1], resolution),
             cont_to_grid(p[2], resolution)} { }
 
     GridPoint(
-        const Point &p, float const resolution, const Point &offset) noexcept :
+        Point const &p, float const resolution, Point const &offset) noexcept :
         _xyz {cont_to_grid(p[0] - offset[0], resolution),
             cont_to_grid(p[1] - offset[1], resolution),
             cont_to_grid(p[2] - offset[2], resolution)} { }
