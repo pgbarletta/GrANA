@@ -1,15 +1,18 @@
 #include "GrANA/grid.hpp"
 namespace GrANA {
 
-GridMolecule::GridMolecule(
-    Molecule const &in_mol, float const resolution, float const bbox_margin) :
+GridMolecule::GridMolecule(Molecule const &in_mol, float const resolution,
+    unsigned int const bbox_margin) :
     _idx_x(sort_indices_uint32(in_mol._x)),
     _idx_y(sort_indices_uint32(in_mol._y)),
     _idx_z(sort_indices_uint32(in_mol._z)), _natoms(in_mol._natoms),
     _resolution(resolution), _bbox_margin(bbox_margin) {
 
-    _origin = Point(std::floor(in_mol._x[_idx_x[0]]),
-        std::floor(in_mol._y[_idx_y[0]]), std::floor(in_mol._z[_idx_z[0]]));
+    float const safe_distance = _resolution * _bbox_margin;
+    // std::floor for rounding.
+    _origin = Point(std::floor(in_mol._x[_idx_x[0]]) - safe_distance,
+        std::floor(in_mol._y[_idx_y[0]]) - safe_distance,
+        std::floor(in_mol._z[_idx_z[0]]) - safe_distance);
 
     construct_GridMolecule(in_mol);
 
@@ -18,7 +21,7 @@ GridMolecule::GridMolecule(
 
 // Build a GridMolecule using a given origin.
 GridMolecule::GridMolecule(Molecule const &in_mol, float const resolution,
-    float const bbox_margin, Point const &origin) :
+    unsigned int const bbox_margin, Point const &origin) :
     _idx_x(sort_indices_uint32(in_mol._x)),
     _idx_y(sort_indices_uint32(in_mol._y)),
     _idx_z(sort_indices_uint32(in_mol._z)), _natoms(in_mol._natoms),
@@ -47,46 +50,50 @@ void GridMolecule::construct_GridMolecule(Molecule const &in_mol) {
         _radii.push_back(in_mol._radii[i]);
     }
 
-    fill_bounding_box(_bbox, in_mol._x[_idx_x[0]] - _bbox_margin,
-        in_mol._y[_idx_y[0]] - _bbox_margin,
-        in_mol._z[_idx_z[0]] - _bbox_margin,
-        in_mol._x[_idx_x[_idx_x.size() - 1]] + _bbox_margin,
-        in_mol._y[_idx_y[_idx_x.size() - 1]] + _bbox_margin,
-        in_mol._z[_idx_z[_idx_x.size() - 1]] + _bbox_margin, _origin,
-        _resolution);
+    // in_mol._(x,y,z)[_idx_(x,y,z)[0]] - _bbox_margin is a bug.
+    fill_bounding_box(_bbox, _x[_idx_x[0]] - _bbox_margin,
+        _y[_idx_y[0]] - _bbox_margin, _z[_idx_z[0]] - _bbox_margin,
+        _x[_idx_x[_idx_x.size() - 1]] + _bbox_margin,
+        _y[_idx_y[_idx_x.size() - 1]] + _bbox_margin,
+        _z[_idx_z[_idx_x.size() - 1]] + _bbox_margin, _resolution, _origin,
+        _bbox_margin);
 
     return;
 }
 
 // Mainly used by GridMolecule to fill its bounding box.
-void fill_bounding_box(BoundingBox &bbox, float const xmin, float const ymin,
-    float const zmin, float const xmax, float const ymax, float const zmax,
-    Point const &origin, float const resolution) {
+void fill_bounding_box(BoundingBox &bbox, grid_t const xmin, grid_t const ymin,
+    grid_t const zmin, grid_t const xmax, grid_t const ymax, grid_t const zmax,
+    float const resolution, Point const &origin, unsigned int const margin) {
 
-    bbox._p[0] = Point(xmin, ymin, zmin);
-    bbox._p[1] = Point(xmax, ymin, zmin);
-    bbox._p[2] = Point(xmin, ymax, zmin);
-    bbox._p[3] = Point(xmax, ymax, zmin);
-    bbox._p[4] = Point(xmin, ymin, zmax);
-    bbox._p[5] = Point(xmax, ymin, zmax);
-    bbox._p[6] = Point(xmin, ymax, zmax);
-    bbox._p[7] = Point(xmax, ymax, zmax);
+    bbox._resolution = resolution;
+    bbox._origin = origin;
+    bbox._bbox_margin = margin;
 
-    bbox._gp[0] = GridPoint(bbox._p[0], resolution, origin);
-    bbox._gp[1] = GridPoint(bbox._p[1], resolution, origin);
-    bbox._gp[2] = GridPoint(bbox._p[2], resolution, origin);
-    bbox._gp[3] = GridPoint(bbox._p[3], resolution, origin);
-    bbox._gp[4] = GridPoint(bbox._p[4], resolution, origin);
-    bbox._gp[5] = GridPoint(bbox._p[5], resolution, origin);
-    bbox._gp[6] = GridPoint(bbox._p[6], resolution, origin);
-    bbox._gp[7] = GridPoint(bbox._p[7], resolution, origin);
+    bbox._gp[0] = GridPoint(xmin, ymin, zmin);
+    bbox._gp[1] = GridPoint(xmax, ymin, zmin);
+    bbox._gp[2] = GridPoint(xmin, ymax, zmin);
+    bbox._gp[3] = GridPoint(xmax, ymax, zmin);
+    bbox._gp[4] = GridPoint(xmin, ymin, zmax);
+    bbox._gp[5] = GridPoint(xmax, ymin, zmax);
+    bbox._gp[6] = GridPoint(xmin, ymax, zmax);
+    bbox._gp[7] = GridPoint(xmax, ymax, zmax);
 
-    bbox._sizes = {bbox._gp[0][0] - bbox._gp[7][0],
-        bbox._gp[0][1] - bbox._gp[7][1], bbox._gp[0][2] - bbox._gp[7][2]};
-    bbox._size = std::max({bbox._sizes[0], bbox._sizes[1], bbox._sizes[2]});
+    // bbox._p[0] = GridPoint_to_point(bbox._gp[0], resolution, origin);
+    // bbox._p[1] = GridPoint_to_point(bbox._gp[1], resolution, origin);
+    // bbox._p[2] = GridPoint_to_point(bbox._gp[2], resolution, origin);
+    // bbox._p[3] = GridPoint_to_point(bbox._gp[3], resolution, origin);
+    // bbox._p[4] = GridPoint_to_point(bbox._gp[4], resolution, origin);
+    // bbox._p[5] = GridPoint_to_point(bbox._gp[5], resolution, origin);
+    // bbox._p[6] = GridPoint_to_point(bbox._gp[6], resolution, origin);
+    // bbox._p[7] = GridPoint_to_point(bbox._gp[7], resolution, origin);
+
+    bbox._dimx = bbox._gp[7][0] - bbox._gp[0][0];
+    bbox._dimy = bbox._gp[7][1] - bbox._gp[0][1];
+    bbox._dimz = bbox._gp[7][2] - bbox._gp[0][2];
+
     // don't mind the rounding.
-    bbox._center = {
-        (bbox._sizes[0]) / 2, (bbox._sizes[1]) / 2, (bbox._sizes[2]) / 2};
+    bbox._center = {bbox._dimx / 2, bbox._dimy / 2, bbox._dimz / 2};
 
     return;
 }
@@ -114,6 +121,32 @@ std::vector<uint32_t> get_atoms_in_bbox(
 
     return in_bounding_box;
 }
+
+// Delegated constructor
+GridMatrix::GridMatrix(grid_t const x, grid_t const y, grid_t const z,
+    float const resolution, Point const origin) :
+    _dimx(x),
+    _dimy(y), _dimz(z), _n(x * y * z), _resolution(resolution),
+    _origin(origin) {
+
+    _bool.reserve(_n);
+    for (grid_t i = 0; i < _n; i++) {
+        if (i % 2 == 0) {
+            _bool.push_back(true);
+        } else {
+            _bool.push_back(true);
+        }
+    }
+
+    return;
+}
+
+// Delegating constructor
+GridMatrix::GridMatrix(GridMolecule const &gmolecule) :
+    GridMatrix(gmolecule._bbox._dimx + 1, gmolecule._bbox._dimy + 1,
+        gmolecule._bbox._dimz + 1, gmolecule._resolution,
+        GridPoint_to_point(gmolecule._bbox._gp[0], gmolecule._resolution,
+            gmolecule._origin)) { }
 
 // auto fill_grid_tetrahedron(GridMolecule const &in_mol)
 //     -> std::vector<std::vector<std::vector<grid_t>>> {
