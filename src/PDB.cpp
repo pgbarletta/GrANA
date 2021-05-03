@@ -65,7 +65,7 @@ auto read_PDB(std::string const &in_filename)
 
 // Write GridPoint as atom to PDB file.
 void draw(GridPoint const &gpoint, FILE *ou_fil, int idx, int resid,
-    Point const &origin, float const resolution) {
+    float const resolution, Point const &origin) {
     float const fx = grid_to_cont(gpoint._xyz[0], resolution) + origin[0];
     float const fy = grid_to_cont(gpoint._xyz[1], resolution) + origin[1];
     float const fz = grid_to_cont(gpoint._xyz[2], resolution) + origin[2];
@@ -85,8 +85,8 @@ void draw_PDB(GridMolecule const &gmolecula, std::string const &ou_fil) {
             GridPoint const atm(
                 gmolecula._x[i], gmolecula._y[i], gmolecula._z[i]);
 
-            draw(atm, file, i + 1, i + 1, gmolecula._origin,
-                gmolecula._resolution);
+            draw(atm, file, i + 1, i + 1, gmolecula._resolution,
+                gmolecula._origin);
         }
     } else {
         std::cerr << "Could not open " << ou_fil << ". " << '\n';
@@ -106,8 +106,8 @@ void draw_selection_PDB(GridMolecule const &gmolecula,
             GridPoint const atm(
                 gmolecula._x[i], gmolecula._y[i], gmolecula._z[i]);
 
-            draw(atm, file, i + 1, i + 1, gmolecula._origin,
-                gmolecula._resolution);
+            draw(atm, file, i + 1, i + 1, gmolecula._resolution,
+                gmolecula._origin);
         }
     } else {
         std::cerr << "Could not open " << ou_fil << ". " << '\n';
@@ -128,8 +128,8 @@ void draw_range_PDB(GridMolecule const &gmolecula, std::string const &ou_fil,
             GridPoint const atm(
                 gmolecula._x[i], gmolecula._y[i], gmolecula._z[i]);
 
-            draw(atm, file, i + 1, i + 1, gmolecula._origin,
-                gmolecula._resolution);
+            draw(atm, file, i + 1, i + 1, gmolecula._resolution,
+                gmolecula._origin);
         }
     } else {
         std::cerr << "Could not open " << ou_fil << ". " << '\n';
@@ -275,7 +275,7 @@ void draw_PDB(BoundingBox const &bbox, std::string const &out_file) {
     FILE *file = std::fopen(out_file.c_str(), "w");
     if (file) {
         for (int i = 0; i < 8; ++i) {
-            draw(bbox._p[i], file, i + 1, 1);
+            draw(bbox._gp[i], file, i + 1, 1, bbox._resolution, bbox._origin);
         }
     } else {
         std::cerr << "Could not open " << out_file << ". " << '\n';
@@ -376,36 +376,27 @@ void draw_PDB(Molecule const &molecula, std::string const &out_file) {
 }
 
 // Write grid matrix to PDB file.
-void draw_grid_mtx(std::string const &out_fil,
-    std::vector<std::vector<std::vector<grid_t>>> const &mtx,
-    Point const &origin, float const resolution) {
-    grid_t const sz_z = mtx.size();
-    grid_t const sz_y = mtx[0].size();
-    grid_t const sz_x = mtx[0][0].size();
+void draw_PDB(GridMatrix const &mtx, std::string const &out_fil) {
 
     grid_t idx = 0;
+    grid_t flat_idx = 0;
+
     FILE *file = std::fopen(out_fil.c_str(), "w");
     if (file) {
-        for (grid_t k = 0; k < sz_z; ++k) {
-            float const fz = grid_to_cont(k, resolution) + origin[2];
-            for (grid_t j = 0; j < sz_y; ++j) {
-                float const fy = grid_to_cont(j, resolution) + origin[1];
-                for (grid_t i = 0; i < sz_x; ++i) {
-                    if (mtx[k][j][i] != 1) {
+        for (grid_t k = 0; k < mtx._dimz; ++k) {
+            for (grid_t j = 0; j < mtx._dimy; ++j) {
+                for (grid_t i = 0; i < mtx._dimx; ++i) {
 
+                    if (mtx._bool[flat_idx] == true) {
                         ++idx;
-                        float const fx =
-                            grid_to_cont(i, resolution) + origin[0];
-                        fmt::print(file,
-                            "{: <6}{: >6} {: <4s} {:3} {:1}{: >3}    "
-                            "{:8.3f}{:8.3f}{:8.3f}{:6.2f}{:6.2f}          {: "
-                            ">2s}\n",
-                            "ATOM  ", idx, "H", "GPU", "A", 0, fx, fy, fz, 0.0,
-                            0.0, "H");
+                        draw({i, j, k}, file, idx, 1, mtx._resolution,
+                            mtx._origin);
                     }
+                    ++flat_idx;
                 }
             }
         }
+
     } else {
         std::cerr << "Could not open " << out_fil << ". " << '\n';
     }
