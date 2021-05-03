@@ -43,16 +43,21 @@ void fill_bounding_box(BoundingBox &bbox, grid_t const xmin, grid_t const ymin,
 class GridMolecule {
 public:
     GridMolecule() = default;
+
     GridMolecule(Molecule const &in_mol, float const resolution,
         unsigned int const bbox_margin);
+
     // Build a GridMolecule using a given origin.
     GridMolecule(Molecule const &in_mol, float const resolution,
         unsigned int const bbox_margin, Point const &origin);
 
+    // Build a GridMolecule from a selection of another GridMolecule. The _bbox
+    // bounding box will not be its bounding box but its parents.
+    GridMolecule(
+        GridMolecule const &in_gmol, std::vector<uint32_t> const subset);
+
     // Finish building GridMolecule.
     void construct_GridMolecule(Molecule const &in_mol);
-
-    void draw(std::string const &ou_fil);
 
     // Indices that sort the atoms along the 3 axes.
     std::vector<uint32_t> const _idx_x, _idx_y, _idx_z;
@@ -80,7 +85,7 @@ public:
 };
 
 // Doing this in O(N), without any sorting or binary search. We'll see. TODO.
-std::vector<uint32_t> get_atoms_in_bbox(
+GridMolecule get_atoms_in_bbox(
     GridMolecule const &molecule, BoundingBox const &bbox);
 
 class GridConvexHull {
@@ -97,12 +102,13 @@ class GridMatrix {
 public:
     GridMatrix() = default;
 
-    // Delegated constructor
-    GridMatrix(grid_t const x, grid_t const y, grid_t const z,
-        float const resolution, Point const origin);
-
     // Delegating constructor
     GridMatrix(GridMolecule const &gmolecule);
+
+    // Delegated constructor
+    GridMatrix(grid_t const x, grid_t const y, grid_t const z,
+        float const resolution, GridPoint const bbox_vtx_0,
+        Point const molecule_origin);
 
     // GridMatrix dimensions.
     grid_t _dimx, _dimy, _dimz;
@@ -118,10 +124,15 @@ public:
 
     // Origin coordinates.
     Point _origin {0.0f, 0.0f, 0.0f};
+    Point _molecule_origin {0.0f, 0.0f, 0.0f};
+    GridPoint _grid_origin {0, 0, 0};
 };
 
 auto fill_grid_tetrahedron(GridMolecule const &in_mol)
     -> std::vector<std::vector<std::vector<grid_t>>>;
+
+// void carve_atom_in_bbox(
+//     std::vector<uint32_t> const &atoms_in_bbox, GridMatrix &mtx);
 
 } // namespace GrANA
 
