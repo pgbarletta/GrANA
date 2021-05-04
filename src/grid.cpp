@@ -61,6 +61,33 @@ void GridMolecule::construct_GridMolecule(Molecule const &in_mol) {
     return;
 }
 
+// Build a GridMolecule from a selection of another GridMolecule. The _bbox
+// bounding box will not be its bounding box but its parents.
+GridMolecule::GridMolecule(
+    GridMolecule const &in_gmol, std::vector<uint32_t> const subset) :
+    _natoms(subset.size()),
+    _resolution(in_gmol._resolution), _bbox_margin(in_gmol._bbox_margin),
+    _origin(in_gmol._origin), _bbox(in_gmol._bbox) {
+
+    _x.reserve(_natoms);
+    _y.reserve(_natoms);
+    _z.reserve(_natoms);
+    _radii.reserve(_natoms);
+
+    for (uint32_t i = 0; static_cast<int>(i) < _natoms; ++i) {
+        auto const atm = subset[i];
+
+        _x.push_back(in_gmol._x[atm]);
+        _y.push_back(in_gmol._y[atm]);
+        _z.push_back(in_gmol._z[atm]);
+        _radii.push_back(in_gmol._radii[atm]);
+    }
+
+    // TODO. Por ahora no le copio los índices q ordenan _idx_x, _idx_y, _idx_z
+
+    return;
+}
+
 // Mainly used by GridMolecule to fill its bounding box.
 void fill_bounding_box(BoundingBox &bbox, grid_t const xmin, grid_t const ymin,
     grid_t const zmin, grid_t const xmax, grid_t const ymax, grid_t const zmax,
@@ -79,15 +106,6 @@ void fill_bounding_box(BoundingBox &bbox, grid_t const xmin, grid_t const ymin,
     bbox._gp[6] = GridPoint(xmin, ymax, zmax);
     bbox._gp[7] = GridPoint(xmax, ymax, zmax);
 
-    // bbox._p[0] = GridPoint_to_point(bbox._gp[0], resolution, origin);
-    // bbox._p[1] = GridPoint_to_point(bbox._gp[1], resolution, origin);
-    // bbox._p[2] = GridPoint_to_point(bbox._gp[2], resolution, origin);
-    // bbox._p[3] = GridPoint_to_point(bbox._gp[3], resolution, origin);
-    // bbox._p[4] = GridPoint_to_point(bbox._gp[4], resolution, origin);
-    // bbox._p[5] = GridPoint_to_point(bbox._gp[5], resolution, origin);
-    // bbox._p[6] = GridPoint_to_point(bbox._gp[6], resolution, origin);
-    // bbox._p[7] = GridPoint_to_point(bbox._gp[7], resolution, origin);
-
     bbox._dimx = bbox._gp[7][0] - bbox._gp[0][0];
     bbox._dimy = bbox._gp[7][1] - bbox._gp[0][1];
     bbox._dimz = bbox._gp[7][2] - bbox._gp[0][2];
@@ -99,19 +117,26 @@ void fill_bounding_box(BoundingBox &bbox, grid_t const xmin, grid_t const ymin,
 }
 
 // Doing this in O(N), without any sorting or binary search. We'll see. TODO.
-std::vector<uint32_t> get_atoms_in_bbox(
+GridMolecule get_atoms_in_bbox(
     GridMolecule const &gmolecule, BoundingBox const &bbox) {
 
+    // TODO. Hardcodeo 2 angstroms de margen p/ incluir átomos.
+    grid_t const x_min = bbox._gp[0][0] - (2 / bbox._resolution);
+    grid_t const x_max = bbox._gp[7][0] + (2 / bbox._resolution);
+
+    grid_t const y_min = bbox._gp[0][1] - (2 / bbox._resolution);
+    grid_t const y_max = bbox._gp[7][1] + (2 / bbox._resolution);
+
+    grid_t const z_min = bbox._gp[0][2] - (2 / bbox._resolution);
+    grid_t const z_max = bbox._gp[7][2] + (2 / bbox._resolution);
+
     std::vector<uint32_t> in_bounding_box;
-    for (uint32_t i = 0; i < gmolecule._x.size(); ++i) {
-        if ((gmolecule._x[i] > bbox._gp[0][0]) &&
-            (gmolecule._x[i] < bbox._gp[7][0])) {
 
-            if ((gmolecule._y[i] > bbox._gp[0][1]) &&
-                (gmolecule._y[i] < bbox._gp[7][1])) {
+    for (uint32_t i = 0; static_cast<int>(i) < gmolecule._natoms; ++i) {
 
-                if ((gmolecule._z[i] > bbox._gp[0][2]) &&
-                    (gmolecule._z[i] < bbox._gp[7][2])) {
+        if ((gmolecule._x[i] > x_min) && (gmolecule._x[i] < x_max)) {
+            if ((gmolecule._y[i] > y_min) && (gmolecule._y[i] < y_max)) {
+                if ((gmolecule._z[i] > z_min) && (gmolecule._z[i] < z_max)) {
 
                     in_bounding_box.push_back(i);
                 }
@@ -119,123 +144,103 @@ std::vector<uint32_t> get_atoms_in_bbox(
         }
     }
 
-    return in_bounding_box;
-}
-
-// Delegated constructor
-GridMatrix::GridMatrix(grid_t const x, grid_t const y, grid_t const z,
-    float const resolution, Point const origin) :
-    _dimx(x),
-    _dimy(y), _dimz(z), _n(x * y * z), _resolution(resolution),
-    _origin(origin) {
-
-    _bool.reserve(_n);
-    for (grid_t i = 0; i < _n; i++) {
-        if (i % 2 == 0) {
-            _bool.push_back(true);
-        } else {
-            _bool.push_back(true);
-        }
-    }
-
-    return;
+    return {gmolecule, in_bounding_box};
 }
 
 // Delegating constructor
 GridMatrix::GridMatrix(GridMolecule const &gmolecule) :
     GridMatrix(gmolecule._bbox._dimx + 1, gmolecule._bbox._dimy + 1,
         gmolecule._bbox._dimz + 1, gmolecule._resolution,
-        GridPoint_to_point(gmolecule._bbox._gp[0], gmolecule._resolution,
-            gmolecule._origin)) { }
+        gmolecule._bbox._gp[0], gmolecule._origin) { }
 
-// auto fill_grid_tetrahedron(GridMolecule const &in_mol)
-//     -> std::vector<std::vector<std::vector<grid_t>>> {
-//     // Inverse square root
-//     float constexpr isqrt = 0.7071f;
-//     std::vector<std::vector<std::vector<grid_t>>> mtx(in_mol._end[2],
-//         std::vector<std::vector<grid_t>>(
-//             in_mol._end[1], std::vector<grid_t>(in_mol._end[0])));
+// Delegated constructor
+GridMatrix::GridMatrix(grid_t const x, grid_t const y, grid_t const z,
+    float const resolution, GridPoint const bbox_vtx_0,
+    Point const molecule_origin) :
+    _dimx(x),
+    _dimy(y), _dimz(z), _n(x * y * z), _resolution(resolution),
+    _grid_origin(bbox_vtx_0), _molecule_origin(molecule_origin) {
 
-//     for (auto ii = 0; ii < in_mol._natoms; ++ii) {
-//         grid_t const x = in_mol._x[ii];
-//         grid_t const y = in_mol._y[ii];
-//         grid_t const z = in_mol._z[ii];
+    _origin = GridPoint_to_point(_grid_origin, _resolution, _molecule_origin);
 
-//         // Atom VdW radius, inner square dimension and their difference.
-//         grid_t const radius = static_cast<grid_t>(
-//             std::floor(in_mol._radii[ii] / in_mol._resolution));
-//         grid_t const is = static_cast<grid_t>(std::floor(radius * isqrt));
-//         [[maybe_unused]] grid_t const leftover = radius - is;
+    _bool.reserve(_n);
+    for (grid_t i = 0; i < _n; i++) {
+        _bool.push_back(true);
+    }
 
-//         for (grid_t k = -is; k <= is; ++k) {
-//             grid_t const iz = z - k;
-//             for (grid_t j = -is; j <= is; ++j) {
-//                 grid_t const iy = y - j;
-//                 for (grid_t i = -is; i <= is; ++i) {
-//                     grid_t const ix = x - i;
-//                     if (ix >= 0 and iy >= 0 and iz >= 0 and
-//                         ix < in_mol._end[0] and iy < in_mol._end[1] and
-//                         iz < in_mol._end[2]) {
-//                         mtx[iz][iy][ix] = 1;
-//                     }
-//                 }
-//             }
-//         }
-//     }
+    return;
+}
 
-//     return mtx;
-//     // for (auto i = 0; i < in_mol._natoms - 3; ++i) {
-//     //     grid_t const x0 = in_mol._x[in_mol._idx_x[i]];
-//     //     grid_t const y0 = in_mol._y[in_mol._idx_x[i]];
-//     //     grid_t const z0 = in_mol._z[in_mol._idx_x[i]];
+void carve_atom_in_bbox(
+    GrANA::GridMolecule const &in_bounding_box, GridMatrix &mtx) {
 
-//     //     grid_t const x1 = in_mol._x[in_mol._idx_x[i + 1]];
-//     //     grid_t const y1 = in_mol._y[in_mol._idx_x[i + 1]];
-//     //     grid_t const z1 = in_mol._z[in_mol._idx_x[i + 1]];
+    GrANA::grid_t const z_plane_size = mtx._dimx * mtx._dimy;
+    std::vector<uint32_t> indices_ocupados;
 
-//     //     grid_t const x2 = in_mol._x[in_mol._idx_x[i + 2]];
-//     //     grid_t const y2 = in_mol._y[in_mol._idx_x[i + 2]];
-//     //     grid_t const z2 = in_mol._z[in_mol._idx_x[i + 2]];
+    for (int a = 0; a < in_bounding_box._natoms; ++a) {
 
-//     //     grid_t const x3 = in_mol._x[in_mol._idx_x[i + 3]];
-//     //     grid_t const y3 = in_mol._y[in_mol._idx_x[i + 3]];
-//     //     grid_t const z3 = in_mol._z[in_mol._idx_x[i + 3]];
+        GrANA::grid_t const x_off = in_bounding_box._x[a] - mtx._grid_origin[0];
+        GrANA::grid_t const y_off = in_bounding_box._y[a] - mtx._grid_origin[1];
+        GrANA::grid_t const z_off = in_bounding_box._z[a] - mtx._grid_origin[2];
 
-//     //     grid_t const x01 = std::fabs(x1 - x0);
-//     //     grid_t const y01 = std::fabs(y1 - y0);
-//     //     grid_t const z01 = std::fabs(z1 - z0);
+        int const centro = z_off * z_plane_size + y_off * mtx._dimx + x_off;
+        int const ancho =
+            std::ceil(in_bounding_box._radii[a] / in_bounding_box._resolution);
 
-//     //     grid_t const x02 = std::fabs(x2 - x0);
-//     //     grid_t const y02 = std::fabs(y2 - y0);
-//     //     grid_t const z02 = std::fabs(z2 - z0);
+        int const extremo_inferior =
+            centro - ancho * z_plane_size - ancho * mtx._dimx;
+        int const extremo_superior =
+            centro + ancho * z_plane_size + ancho * mtx._dimx;
 
-//     //     grid_t const x03 = std::fabs(x3 - x0);
-//     //     grid_t const y03 = std::fabs(y3 - y0);
-//     //     grid_t const z03 = std::fabs(z3 - z0);
+        if (extremo_inferior < 0 ||
+            extremo_superior >= static_cast<int>(mtx._n)) {
+            // The atom is on the outer cells of the box. Its VdW radius
+            // protrudes out of the box. Trying to set surrounding cells as
+            // empty will cause a segmentation fault on `mtx._bool` vector.
 
-//     //     grid_t const x12 = std::fabs(x2 - x1);
-//     //     grid_t const y12 = std::fabs(y2 - y1);
-//     //     grid_t const z12 = std::fabs(z2 - z1);
+            for (int k = -ancho; k <= ancho; ++k) {
+                for (int j = -ancho; j <= ancho; ++j) {
 
-//     //     grid_t const x13 = std::fabs(x3 - x1);
-//     //     grid_t const y13 = std::fabs(y3 - y1);
-//     //     grid_t const z13 = std::fabs(z3 - z1);
+                    int const beg = centro + k * z_plane_size + j * mtx._dimx;
+                    int const end = beg + ancho;
 
-//     //     grid_t const x23 = std::fabs(x3 - x2);
-//     //     grid_t const y23 = std::fabs(y3 - y2);
-//     //     grid_t const z23 = std::fabs(z3 - z2);
+                    for (uint32_t i = beg; static_cast<int>(i) < end; ++i) {
+                        if (i < mtx._n) {
+                            // if i >= mtx._n, then beg was negative and `i`
+                            // overflowed (atome close to the beginnning of the
+                            // matrix), or`i` is just too large (atom close to
+                            // the end of the matrix).
 
-//     //     grid_t const d01 = x01 * x01 + y01 * y01 + z01 * z01;
-//     //     grid_t const d02 = x02 * x02 + y02 * y02 + z02 * z02;
-//     //     grid_t const d03 = x03 * x03 + y03 * y03 + z03 * z03;
+                            // VdW radii of bonded atoms overlap, hence this is
+                            // gonna be a race condition when parallelized. I
+                            // don't mind 'cause all I'm doing is setting it to
+                            // false.
 
-//     //     float const mn = (4 / (resolution * resolution));
+                            mtx._bool[i] = false;
+                        }
+                    }
+                }
+            }
+        } else {
+            for (int k = -ancho; k <= ancho; ++k) {
+                for (int j = -ancho; j <= ancho; ++j) {
 
-//     //     if (d01 > mn || d02 > mn || d03 > mn)
-//     //         printf("%i+%i+%i+%i\n", in_mol._idx_x[i], in_mol._idx_x[i +
-//     1],
-//     //             in_mol._idx_x[i + 2], in_mol._idx_x[i + 3]);
-//     // }
-// }
+                    int const beg = centro + k * z_plane_size + j * mtx._dimx;
+                    int const end = beg + ancho;
+
+                    for (uint32_t i = beg; static_cast<int>(i) < end; ++i) {
+                        // VdW radii of bonded atoms overlap, hence this is
+                        // gonna be a race condition when parallelized. I don't
+                        // mind 'cause all I'm doing is setting it to false.
+
+                        mtx._bool[i] = false;
+                    }
+                }
+            }
+        }
+    }
+
+    return;
+}
 
 }
