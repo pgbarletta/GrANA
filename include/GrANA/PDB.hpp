@@ -21,7 +21,7 @@ auto read_PDB(std::string const &in_filename) -> std::tuple<Molecule, Molecule>;
 
 // Write GridPoint as atom to PDB file.
 void draw(GridPoint const &gpoint, FILE *ou_fil, int idx, int resid,
-    Point const &origin, float const resolution);
+    float const resolution, Point const &origin);
 
 // Write GridMolecule to PDB file.
 void draw_PDB(GridMolecule const &gmolecula, std::string const &ou_fil);
@@ -71,9 +71,7 @@ void draw_PDB(Triangulation const &triangulacion, std::string const &out_file);
 void draw_PDB(Molecule const &molecula, std::string const &out_file);
 
 // Write grid matrix to PDB file.
-void draw_grid_mtx(std::string const &out_fil,
-    std::vector<std::vector<std::vector<grid_t>>> const &mtx,
-    Point const &origin, float const resolution);
+void draw_PDB(GridMatrix const &mtx, std::string const &out_fil);
 
 }
 #endif // _H
