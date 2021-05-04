@@ -4,7 +4,7 @@ namespace GrANA {
 
 // Read input.
 auto get_input(int argc, char **argv)
-    -> std::tuple<std::string, float, float, std::string> {
+    -> std::tuple<std::string, float, unsigned int, std::string> {
 
     float resolution = 1.f;
     float margin = 1.f;
