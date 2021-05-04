@@ -124,15 +124,15 @@ public:
 
     // Origin coordinates.
     Point _origin {0.0f, 0.0f, 0.0f};
-    Point _molecule_origin {0.0f, 0.0f, 0.0f};
     GridPoint _grid_origin {0, 0, 0};
+    Point _molecule_origin {0.0f, 0.0f, 0.0f};
 };
 
 auto fill_grid_tetrahedron(GridMolecule const &in_mol)
     -> std::vector<std::vector<std::vector<grid_t>>>;
 
-// void carve_atom_in_bbox(
-//     std::vector<uint32_t> const &atoms_in_bbox, GridMatrix &mtx);
+auto carve_atom_in_bbox(
+    GrANA::GridMolecule const &in_bounding_box, GridMatrix &mtx) -> void;
 
 } // namespace GrANA
 
