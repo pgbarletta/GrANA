@@ -103,15 +103,22 @@ public:
     GridMatrix() = default;
 
     // Delegating constructor
-    GridMatrix(GridMolecule const &gmolecule);
+    GridMatrix(GridMolecule const &gmolecule, uint32_t const gap_depth);
 
     // Delegated constructor
     GridMatrix(grid_t const x, grid_t const y, grid_t const z,
-        float const resolution, GridPoint const bbox_vtx_0,
-        Point const molecule_origin);
+        uint32_t const gap_depth, float const resolution,
+        GridPoint const bbox_vtx_0, Point const molecule_origin);
 
     // GridMatrix dimensions.
     grid_t _dimx, _dimy, _dimz;
+
+    // Number of grid points between this matrix and the Bounding Box it came
+    // from.
+    grid_t _gap_depth;
+
+    // Size of the planes that go along the Z axis(_dimx * _dimy).
+    grid_t _plane_size;
 
     // Number of grid particles.
     grid_t _n;
@@ -128,10 +135,8 @@ public:
     Point _molecule_origin {0.0f, 0.0f, 0.0f};
 };
 
-auto fill_grid_tetrahedron(GridMolecule const &in_mol)
-    -> std::vector<std::vector<std::vector<grid_t>>>;
-
-auto carve_atom_in_bbox(
+// Remove grid points overlapping with atoms. TODO. Parallelize this.
+auto carve_atoms_in_mtx(
     GrANA::GridMolecule const &in_bounding_box, GridMatrix &mtx) -> void;
 
 } // namespace GrANA

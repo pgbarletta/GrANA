@@ -121,14 +121,21 @@ GridMolecule get_atoms_in_bbox(
     GridMolecule const &gmolecule, BoundingBox const &bbox) {
 
     // TODO. Hardcodeo 2 angstroms de margen p/ incluir átomos.
-    grid_t const x_min = bbox._gp[0][0] - (2 / bbox._resolution);
-    grid_t const x_max = bbox._gp[7][0] + (2 / bbox._resolution);
+    // grid_t const x_min = bbox._gp[0][0] - (2 / bbox._resolution);
+    // grid_t const x_max = bbox._gp[7][0] + (2 / bbox._resolution);
 
-    grid_t const y_min = bbox._gp[0][1] - (2 / bbox._resolution);
-    grid_t const y_max = bbox._gp[7][1] + (2 / bbox._resolution);
+    // grid_t const y_min = bbox._gp[0][1] - (2 / bbox._resolution);
+    // grid_t const y_max = bbox._gp[7][1] + (2 / bbox._resolution);
 
-    grid_t const z_min = bbox._gp[0][2] - (2 / bbox._resolution);
-    grid_t const z_max = bbox._gp[7][2] + (2 / bbox._resolution);
+    // grid_t const z_min = bbox._gp[0][2] - (2 / bbox._resolution);
+    // grid_t const z_max = bbox._gp[7][2] + (2 / bbox._resolution);
+
+    grid_t const x_min = bbox._gp[0][0];
+    grid_t const x_max = bbox._gp[7][0];
+    grid_t const y_min = bbox._gp[0][1];
+    grid_t const y_max = bbox._gp[7][1];
+    grid_t const z_min = bbox._gp[0][2];
+    grid_t const z_max = bbox._gp[7][2];
 
     std::vector<uint32_t> in_bounding_box;
 
@@ -147,50 +154,76 @@ GridMolecule get_atoms_in_bbox(
     return {gmolecule, in_bounding_box};
 }
 
-// Delegating constructor
-GridMatrix::GridMatrix(GridMolecule const &gmolecule) :
+// Delegating constructor.
+GridMatrix::GridMatrix(
+    GridMolecule const &gmolecule, uint32_t const gap_depth) :
     GridMatrix(gmolecule._bbox._dimx + 1, gmolecule._bbox._dimy + 1,
-        gmolecule._bbox._dimz + 1, gmolecule._resolution,
+        gmolecule._bbox._dimz + 1, gap_depth, gmolecule._resolution,
         gmolecule._bbox._gp[0], gmolecule._origin) { }
 
-// Delegated constructor
+// Delegated constructor.
 GridMatrix::GridMatrix(grid_t const x, grid_t const y, grid_t const z,
-    float const resolution, GridPoint const bbox_vtx_0,
-    Point const molecule_origin) :
+    uint32_t const gap_depth, float const resolution,
+    GridPoint const bbox_vtx_0, Point const molecule_origin) :
     _dimx(x),
-    _dimy(y), _dimz(z), _n(x * y * z), _resolution(resolution),
-    _grid_origin(bbox_vtx_0), _molecule_origin(molecule_origin) {
+    _dimy(y), _dimz(z), _gap_depth(gap_depth), _plane_size(x * y),
+    _n(x * y * z), _resolution(resolution), _grid_origin(bbox_vtx_0),
+    _molecule_origin(molecule_origin) {
 
     _origin = GridPoint_to_point(_grid_origin, _resolution, _molecule_origin);
 
     _bool.reserve(_n);
-    for (grid_t i = 0; i < _n; i++) {
-        _bool.push_back(true);
+
+    // First `_gap_depth` planes are empty.
+    _bool.insert(std::end(_bool), _gap_depth * _plane_size, false);
+    // Now, the subsequent plantes are empty on the borders, but filled on the
+    // inside.
+    int const n_planes = _dimz - (2 * _gap_depth);
+    for (int i = 0; i < n_planes; i++) {
+        // First `_gap_depth` rows are empty.
+        _bool.insert(std::end(_bool), _gap_depth * _dimx, false);
+        // Now, the next rows begin with `_gap_depth` grid points empty, then
+        // the next ones are filled, and the final `_gap_depth` grid points are
+        // also empty.
+        int const n_rows = _dimy - 2 * _gap_depth;
+        int const n_dots = _dimx - 2 * _gap_depth;
+        for (int i = 0; i < n_rows; i++) {
+            _bool.insert(std::end(_bool), _gap_depth, false);
+            _bool.insert(std::end(_bool), n_dots, true);
+            _bool.insert(std::end(_bool), _gap_depth, false);
+        }
+        // Last `_gap_depth` rows are empty.
+        _bool.insert(std::end(_bool), _gap_depth * _dimx, false);
     }
+    // Last `_gap_depth` planes are empty.
+    _bool.insert(std::end(_bool), _gap_depth * _plane_size, false);
 
     return;
 }
 
-void carve_atom_in_bbox(
+// Remove grid points overlapping with atoms. TODO. Parallelize this.
+void carve_atoms_in_mtx(
     GrANA::GridMolecule const &in_bounding_box, GridMatrix &mtx) {
 
-    GrANA::grid_t const z_plane_size = mtx._dimx * mtx._dimy;
+    grid_t const _plane_size = mtx._dimx * mtx._dimy;
     std::vector<uint32_t> indices_ocupados;
 
     for (int a = 0; a < in_bounding_box._natoms; ++a) {
+        // The atoms are using a different grid origin that the matrix.
+        grid_t const x_off = in_bounding_box._x[a] - mtx._grid_origin[0];
+        grid_t const y_off = in_bounding_box._y[a] - mtx._grid_origin[1];
+        grid_t const z_off = in_bounding_box._z[a] - mtx._grid_origin[2];
 
-        GrANA::grid_t const x_off = in_bounding_box._x[a] - mtx._grid_origin[0];
-        GrANA::grid_t const y_off = in_bounding_box._y[a] - mtx._grid_origin[1];
-        GrANA::grid_t const z_off = in_bounding_box._z[a] - mtx._grid_origin[2];
-
-        int const centro = z_off * z_plane_size + y_off * mtx._dimx + x_off;
+        // What follows is all about turning the x, y, z coordinates of the atom
+        // center and all the overlapping grid points into a linear array.
+        int const centro = z_off * _plane_size + y_off * mtx._dimx + x_off;
         int const ancho =
             std::ceil(in_bounding_box._radii[a] / in_bounding_box._resolution);
 
         int const extremo_inferior =
-            centro - ancho * z_plane_size - ancho * mtx._dimx;
+            centro - ancho * _plane_size - ancho * mtx._dimx;
         int const extremo_superior =
-            centro + ancho * z_plane_size + ancho * mtx._dimx;
+            centro + ancho * _plane_size + ancho * mtx._dimx;
 
         if (extremo_inferior < 0 ||
             extremo_superior >= static_cast<int>(mtx._n)) {
@@ -201,7 +234,7 @@ void carve_atom_in_bbox(
             for (int k = -ancho; k <= ancho; ++k) {
                 for (int j = -ancho; j <= ancho; ++j) {
 
-                    int const beg = centro + k * z_plane_size + j * mtx._dimx;
+                    int const beg = centro + k * _plane_size + j * mtx._dimx;
                     int const end = beg + ancho;
 
                     for (uint32_t i = beg; static_cast<int>(i) < end; ++i) {
@@ -225,7 +258,7 @@ void carve_atom_in_bbox(
             for (int k = -ancho; k <= ancho; ++k) {
                 for (int j = -ancho; j <= ancho; ++j) {
 
-                    int const beg = centro + k * z_plane_size + j * mtx._dimx;
+                    int const beg = centro + k * _plane_size + j * mtx._dimx;
                     int const end = beg + ancho;
 
                     for (uint32_t i = beg; static_cast<int>(i) < end; ++i) {
