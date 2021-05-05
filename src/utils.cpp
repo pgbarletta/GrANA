@@ -4,22 +4,23 @@ namespace GrANA {
 
 // Read input.
 auto get_input(int argc, char **argv)
-    -> std::tuple<std::string, float, unsigned int, std::string> {
+    -> std::tuple<std::string, float, uint32_t, uint32_t, std::string> {
 
     float resolution = 1.f;
-    float margin = 1.f;
+    uint32_t margin = 0, gap_depth = 0;
     try {
-        if (argc != 5) {
+        if (argc != 6) {
             throw std::invalid_argument(
-                "Usage: GrANA in_pdb resolution margin out_pdb\n");
+                "Usage: GrANA in_pdb resolution margin gap_depth out_pdb\n");
         }
 
         resolution = std::stof(argv[2]);
-        margin = std::stof(argv[3]);
+        margin = std::stoi(argv[3]);
+        gap_depth = std::stoi(argv[4]);
 
     } catch (...) { std::terminate(); }
 
-    return {argv[1], resolution, margin, argv[4]};
+    return {argv[1], resolution, margin, gap_depth, argv[5]};
 }
 
 // Helper function to get the indices of the true elements of a bool array.
