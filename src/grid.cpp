@@ -234,8 +234,9 @@ void carve_atoms_in_mtx(
             for (int k = -ancho; k <= ancho; ++k) {
                 for (int j = -ancho; j <= ancho; ++j) {
 
-                    int const beg = centro + k * _plane_size + j * mtx._dimx;
-                    int const end = beg + ancho;
+                    int const beg =
+                        centro - ancho + k * _plane_size + j * mtx._dimx;
+                    int const end = beg + 2 * ancho;
 
                     for (uint32_t i = beg; static_cast<int>(i) < end; ++i) {
                         if (i < mtx._n) {
