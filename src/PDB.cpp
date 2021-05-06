@@ -388,9 +388,9 @@ void draw_PDB(GridMatrix const &mtx, std::string const &out_fil) {
                 for (grid_t i = 0; i < mtx._dimx; ++i) {
 
                     if (mtx._bool[flat_idx] == true) {
-                        ++idx;
-                        draw({i, j, k}, file, idx, 1, mtx._resolution,
-                            mtx._origin);
+                        // 99999 is the maximum atom number
+                        draw({i, j, k}, file, idx++ % 99999 + 1, 1,
+                            mtx._resolution, mtx._origin);
                     }
                     ++flat_idx;
                 }
