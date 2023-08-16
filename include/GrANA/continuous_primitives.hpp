@@ -66,8 +66,8 @@ inline float norm(Vector const &v) {
     return std::sqrt(dx * dx + dy * dy + dz * dz);
 }
 
-inline auto determinant(Vector const &v0, Vector const &v1, Vector const &v2)
-    -> float {
+[[nodiscard]] inline auto determinant(
+    Vector const &v0, Vector const &v1, Vector const &v2) -> float {
     // First, compute the det2x2.
     float const m01 = v0[0] * v1[1] - v0[1] * v1[0];
     float const m02 = v0[0] * v2[1] - v0[1] * v2[0];
@@ -119,12 +119,12 @@ inline bool operator==(Point const &lhs, Point const &rhs) {
     return (lhs[0] == rhs[0] && lhs[1] == rhs[1] && lhs[2] == rhs[2]);
 }
 
-inline Vector point_to_vector(Point const &in_point) {
+[[nodiscard]] inline Vector point_to_vector(Point const &in_point) {
     return Vector(in_point[0], in_point[1], in_point[2]);
 }
 
 // Get the distance between 2 points
-inline float distance(Point const &p0, Point const &p1) {
+[[nodiscard]] inline float distance(Point const &p0, Point const &p1) {
     float const dx = p0[0] - p1[0];
     float const dy = p0[1] - p1[1];
     float const dz = p0[2] - p1[2];

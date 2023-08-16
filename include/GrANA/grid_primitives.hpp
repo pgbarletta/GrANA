@@ -54,7 +54,7 @@ inline std::ostream &operator<<(std::ostream &stream, const GridPoint &p) {
 // Turn a grid point into a continuous point, given the resolution.
 // This is not a constructor in the `Point` class to avoid circular
 // dependencies.
-inline Point GridPoint_to_point(
+[[nodiscard]] inline Point GridPoint_to_point(
     GridPoint const &in_point, float const resolution) {
     return Point(grid_to_cont(in_point[0], resolution),
         grid_to_cont(in_point[1], resolution),
@@ -63,7 +63,7 @@ inline Point GridPoint_to_point(
 
 // Turn a grid point into a continuous point, given the resolution and an
 // origin.
-inline Point GridPoint_to_point(
+[[nodiscard]] inline Point GridPoint_to_point(
     GridPoint const &in_point, float const resolution, Point const &origin) {
     return Point(grid_to_cont(in_point[0], resolution) + origin[0],
         grid_to_cont(in_point[1], resolution) + origin[1],

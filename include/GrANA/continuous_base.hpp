@@ -53,7 +53,7 @@ inline std::ostream &operator<<(std::ostream &stream, Tetrahedron const &t) {
     return stream;
 }
 
-inline auto determinant(Tetrahedron const &t) -> float {
+[[nodiscard]] inline auto determinant(Tetrahedron const &t) -> float {
     Vector const v10 = t[1] - t[0];
     Vector const v20 = t[2] - t[0];
     Vector const v30 = t[3] - t[0];
